@@ -1,0 +1,193 @@
+<Window x:Class="VmTyper.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:VmTyper.Models"
+        xmlns:helpers="clr-namespace:VmTyper.Helpers"
+        Title="Configurações — VmTyper"
+        Width="560" Height="600" MinWidth="500" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0">
+            <!-- Digitação -->
+            <TabItem Header="Digitação">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Presets de velocidade" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <WrapPanel Margin="0,0,0,10">
+                        <Button Content="Instantâneo" Click="PresetInstantaneo_Click"/>
+                        <Button Content="Muito rápido" Click="PresetMuitoRapido_Click"/>
+                        <Button Content="Rápido" Click="PresetRapido_Click"/>
+                        <Button Content="Normal" Click="PresetNormal_Click"/>
+                        <Button Content="Compatibilidade" Click="PresetCompatibilidade_Click"/>
+                    </WrapPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Intervalo entre caracteres (ms):" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="CharDelayBox"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Intervalo após Enter (ms):" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="EnterDelayBox"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Contagem regressiva (segundos):" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="CountdownBox"/>
+                    </Grid>
+
+                    <TextBlock Text="Método de digitação" FontWeight="Bold" Margin="0,16,0,6"/>
+                    <ComboBox x:Name="MethodCombo">
+                        <ComboBoxItem Content="Automático (recomendado)" Tag="Automatico"/>
+                        <ComboBoxItem Content="Teclado físico (Virtual Key + Scan Code)" Tag="TecladoFisico"/>
+                        <ComboBoxItem Content="Unicode (KEYEVENTF_UNICODE)" Tag="Unicode"/>
+                    </ComboBox>
+                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                        Automático: usa Teclado Físico e cai para Unicode apenas nos caracteres não suportados pelo layout ativo.
+                        Teclado Físico: reproduz teclas reais (mais compatível com consoles VMware HTML5, que costumam encaminhar eventos de teclado físico à VM).
+                        Unicode: injeta o caractere diretamente, ignorando o layout; pode não funcionar em todos os consoles VMware.
+                    </TextBlock>
+
+                    <CheckBox x:Name="PreserveIndentationCheck" Content="Preservar indentação original" Margin="0,16,0,4"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                        Ao iniciar uma nova linha, remove a autoindentação do editor de destino (Shift+Home, Delete) e reaplica a indentação existente no texto original. Recomendado para editores de código como o Delphi IDE, que auto-indentam após Enter. Teste em um arquivo descartável antes de usar em código real — o VmTyper não tem como confirmar que o reset de cursor funcionou no seu editor específico.
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Atalhos -->
+            <TabItem Header="Atalhos">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Iniciar digitação" FontWeight="Bold"/>
+                    <DockPanel Margin="0,4,0,14">
+                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CaptureStartHotkey_Click"/>
+                        <TextBox x:Name="StartHotkeyBox" IsReadOnly="True"/>
+                    </DockPanel>
+
+                    <TextBlock Text="Pausar / Continuar" FontWeight="Bold"/>
+                    <DockPanel Margin="0,4,0,14">
+                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CapturePauseHotkey_Click"/>
+                        <TextBox x:Name="PauseHotkeyBox" IsReadOnly="True"/>
+                    </DockPanel>
+
+                    <TextBlock Text="Cancelar (emergência)" FontWeight="Bold"/>
+                    <TextBox Text="ESC (fixo, ativo somente durante a digitação)" IsReadOnly="True" Margin="0,4,0,0" Background="#EEEEEE"/>
+
+                    <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                        Clique em "Capturar" e pressione a combinação desejada (ex.: Ctrl+Shift+Enter). Use pelo menos um modificador (Ctrl, Shift ou Alt).
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Segurança -->
+            <TabItem Header="Segurança">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="ValidateWindowCheck" Content="Validar navegador de destino antes de digitar" Margin="0,0,0,10"/>
+                    <TextBlock Text="Navegador esperado:" Margin="0,0,0,4"/>
+                    <ComboBox x:Name="ExpectedBrowserCombo">
+                        <ComboBoxItem Content="Nenhum (não validar)" Tag="Nenhum"/>
+                        <ComboBoxItem Content="Google Chrome" Tag="Chrome"/>
+                        <ComboBoxItem Content="Microsoft Edge" Tag="Edge"/>
+                        <ComboBoxItem Content="Firefox" Tag="Firefox"/>
+                    </ComboBox>
+                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                        Antes de iniciar a digitação (após a contagem regressiva), o aplicativo verifica se a janela em primeiro plano do host pertence ao navegador configurado. O Notepad dentro da VM não é uma janela real do Windows host, portanto a validação é feita sobre o navegador.
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Substituições de caracteres -->
+            <TabItem Header="Substituições">
+                <DockPanel Margin="10">
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10">
+                        Se a VM de destino digita algum símbolo errado (layout de teclado desconfigurado), cadastre aqui o caractere original ("De") e o que deve ser digitado no lugar. Pode ser um texto simples (digitado pelo caminho normal) ou uma combinação de teclas física exata — útil quando a VM interpreta um modificador (ex.: Shift) de forma diferente dependendo da tecla física, mesmo com o Shift corretamente pressionado.
+                    </TextBlock>
+
+                    <Button DockPanel.Dock="Bottom" Content="+ Adicionar substituição" Click="AddSubstitution_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="SubstitutionsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:CharacterSubstitution}">
+                                    <Border BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,8">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="De: " VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="1" Text="{Binding From, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontFamily="Consolas" ToolTip="Caractere/símbolo original, como aparece no texto a digitar"/>
+                                                <Button Grid.Column="2" Content="Remover" Margin="6,0,0,0" Tag="{Binding}" Click="RemoveSubstitution_Click"/>
+                                            </Grid>
+
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <RadioButton Content="Texto" Margin="0,0,16,0" VerticalAlignment="Center"
+                                                             IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Texto}"/>
+                                                <RadioButton Content="Combinação de teclas" VerticalAlignment="Center"
+                                                             IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Combinacao}"/>
+                                            </StackPanel>
+
+                                            <Grid Margin="0,6,0,0"
+                                                  Visibility="{Binding Mode, Converter={x:Static helpers:EnumToVisibilityConverter.Instance}, ConverterParameter=Texto}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Para: " VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="1" Text="{Binding To, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontFamily="Consolas" ToolTip="Substituto que será digitado pelo caminho normal (layout/dead keys/Unicode)"/>
+                                            </Grid>
+
+                                            <Grid Margin="0,6,0,0"
+                                                  Visibility="{Binding Mode, Converter={x:Static helpers:EnumToVisibilityConverter.Instance}, ConverterParameter=Combinacao}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Text="{Binding ComboLabel, Mode=OneWay}" IsReadOnly="True"
+                                                         Background="#EEEEEE" FontFamily="Consolas"/>
+                                                <Button Grid.Column="1" Content="Capturar" Margin="6,0,0,0" Tag="{Binding}" Click="CaptureSubstitutionCombo_Click"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+
+            <!-- Comportamento -->
+            <TabItem Header="Comportamento">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="MinimizeToTrayCheck" Content="Minimizar para a bandeja do sistema" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="StartMinimizedCheck" Content="Iniciar minimizado" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="AlwaysOnTopCheck" Content="Sempre no topo" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ClearAfterCompletionCheck" Content="Limpar conteúdo do bloco após conclusão" Margin="0,0,0,10"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                        Quando ativado, ao concluir um bloco com sucesso o texto dele é apagado — mas o bloco continua existindo na fila (posição e histórico preservados), apenas vazio.
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Salvar" Click="Save_Click" MinWidth="90"/>
+            <Button Content="Cancelar" Click="CancelButton_Click" MinWidth="90"/>
+        </StackPanel>
+    </Grid>
+</Window>

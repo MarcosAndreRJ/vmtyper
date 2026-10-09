@@ -1,0 +1,190 @@
+<Window x:Class="VmTyper.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:VmTyper.Helpers"
+        xmlns:models="clr-namespace:VmTyper.Models"
+        Title="VmTyper — Digitação automatizada para VM via navegador"
+        Width="1000" Height="680" MinWidth="820" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        StateChanged="Window_StateChanged"
+        Closing="Window_Closing">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Barra superior -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button Content="Teste de Teclado" Click="OpenDiagnostics_Click"/>
+                <Button Content="Configurações" Click="OpenSettings_Click"/>
+            </StackPanel>
+            <TextBlock Text="VmTyper" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Conteúdo principal -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="1*" MinWidth="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Fila de blocos de texto -->
+            <DockPanel Grid.Column="0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"/>
+                    <Button Content="REINICIAR FILA" Click="RestartQueue_Click"/>
+                    <Button Content="NOVA FILA" Click="NewQueue_Click"/>
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding QueueSummary}"
+                           FontWeight="Bold" Margin="0,8,0,0"/>
+
+                <Border IsEnabled="{Binding IsBusy, Converter={x:Static helpers:InverseBoolConverter.Instance}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Blocks}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:TextBlockItem}">
+                                    <Border BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Current">
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="2"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Typing">
+                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="2"/>
+                                                        <Setter Property="Background" Value="#FFF8E8"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                                        <Setter Property="Background" Value="#F1FAF3"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="Bold"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding StatusLabel}" FontWeight="Bold"/>
+                                            </Grid>
+
+                                            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                                                     AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                                                     MaxHeight="140" VerticalScrollBarVisibility="Auto"
+                                                     FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"/>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="Gray" FontSize="11">
+                                                    <Run Text="{Binding CharacterCount, Mode=OneWay, StringFormat='Caracteres: {0}'}"/>
+                                                    <Run Text="    "/>
+                                                    <Run Text="{Binding LineCount, Mode=OneWay, StringFormat='Linhas: {0}'}"/>
+                                                </TextBlock>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                    <Button Content="↑" Padding="8,2" MinWidth="30"
+                                                            Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                    <Button Content="↓" Padding="8,2" MinWidth="30"
+                                                            Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                    <Button Content="Definir como próximo" Padding="8,2"
+                                                            Command="{Binding DataContext.SetAsNextCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                    <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch" Background="Transparent"/>
+
+            <!-- Painel lateral: status / histórico / log -->
+            <TabControl Grid.Column="2">
+                <TabItem Header="Status">
+                    <StackPanel Margin="6">
+                        <TextBlock Text="Estado:" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding StateText}" FontSize="16" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="{Binding CountdownText}" FontSize="20" FontWeight="Bold"
+                                   Foreground="{StaticResource WarnBrush}" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding PercentComplete, Mode=OneWay}" Height="18"/>
+                        <TextBlock Margin="0,4,0,0">
+                            <Run Text="{Binding TypedCharacters, Mode=OneWay}"/>
+                            <Run Text=" / "/>
+                            <Run Text="{Binding TotalCharacters, Mode=OneWay}"/>
+                            <Run Text=" caracteres ("/>
+                            <Run Text="{Binding PercentComplete, Mode=OneWay, StringFormat={}{0:0}}"/>
+                            <Run Text="%)"/>
+                        </TextBlock>
+                        <TextBlock Text="{Binding QueueProgressLabel}" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Tempo decorrido" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding ElapsedText}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Caracteres/seg" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding CpsText}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </TabItem>
+
+                <TabItem Header="Histórico">
+                    <DockPanel Margin="6">
+                        <Button DockPanel.Dock="Bottom" Content="Limpar histórico" Command="{Binding ClearHistoryCommand}"/>
+                        <ListBox ItemsSource="{Binding History}" DisplayMemberPath="DisplayText" FontFamily="Consolas" FontSize="11"/>
+                    </DockPanel>
+                </TabItem>
+
+                <TabItem Header="Log">
+                    <ListBox ItemsSource="{Binding LogLines}" FontFamily="Consolas" FontSize="11" Margin="6"/>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Barra de ações -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+            <Button x:Name="DigitarButton" Command="{Binding StartCommand}" MinWidth="170" Padding="12,8" Background="{StaticResource OkBrush}" Foreground="White">
+                <StackPanel>
+                    <TextBlock Text="{Binding DigitarButtonText}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding NextBlockLabel}" FontSize="10" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Content="{Binding PauseResumeButtonText}" Command="{Binding PauseResumeCommand}" MinWidth="130"/>
+            <Button Content="CANCELAR (ESC)" Command="{Binding CancelCommand}" MinWidth="130" Background="{StaticResource DangerBrush}" Foreground="White"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Text="Dica: pressione ESC a qualquer momento durante a digitação para cancelar imediatamente."
+                   HorizontalAlignment="Center" Margin="0,6,0,0" FontStyle="Italic" Foreground="Gray"/>
+    </Grid>
+</Window>
