@@ -28,6 +28,7 @@
     <!-- Reaproveita os falsos e o harness dos testes unitários. -->
     <Compile Include="..\VmTyper.Tests\Fakes\*.cs" Link="Fakes\%(Filename)%(Extension)" />
     <Compile Include="..\VmTyper.Tests\Infrastructure.cs" Link="Infrastructure.cs" />
+    <None Include="..\corpora\*.txt" Link="corpora\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

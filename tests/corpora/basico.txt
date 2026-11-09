@@ -1,0 +1,9 @@
+Teste:
+abcdefghijklmnopqrstuvwxyz
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+0123456789
+áàãâéêíóôõúç
+ÁÀÃÂÉÊÍÓÔÕÚÇ
+! @ # $ % ¨ & * ( ) - _ = +
+~ ^ ´ ` ~a ^e
+	tab e fim
