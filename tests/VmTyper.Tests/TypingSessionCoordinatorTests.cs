@@ -101,7 +101,7 @@ public sealed class TypingSessionCoordinatorTests : IDisposable
         queue.RestartQueue();
 
         var settings = new SettingsService(_dir.File("settings.json"));
-        settings.Save(new AppSettings { CountdownSeconds = 3, ValidateTargetWindow = false });
+        settings.Save(new AppSettings { CountdownSeconds = 3, ValidateTargetWindow = false, EnableTargetGuard = false });
         var history = new HistoryService(_dir.File("history.json"));
 
         var ticks = new List<TaskCompletionSource<bool>>();

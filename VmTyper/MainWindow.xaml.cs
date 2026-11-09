@@ -25,6 +25,7 @@ public partial class MainWindow : Window
 
         viewModel.ConfirmPartialResume = ConfirmPartialResumeDialog;
         viewModel.ConfirmPreflightUnsupported = ConfirmPreflightUnsupportedDialog;
+        viewModel.ConfirmTargetChanged = ConfirmTargetChangedDialog;
 
         if (App.QueueLoadCorruptPath is { } corruptPath)
         {
@@ -149,6 +150,21 @@ public partial class MainWindow : Window
             MessageBoxResult.No => PreflightDecision.SkipUnsupported,
             _ => PreflightDecision.Cancel
         };
+    }
+
+    private bool ConfirmTargetChangedDialog(Services.TargetAnchor previous, Services.TargetAnchor current)
+    {
+        var res = MessageBox.Show(this,
+            $"O destino mudou.\n" +
+            $"Anterior: {previous.ProcessName} (0x{previous.Hwnd:X})\n" +
+            $"Atual: {current.ProcessName} (0x{current.Hwnd:X})\n\n" +
+            $"Usar a nova janela como destino?",
+            "Destino alterado",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        return res == MessageBoxResult.Yes;
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)

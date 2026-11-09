@@ -37,12 +37,16 @@ public sealed class MainViewModel : ObservableObject
     private readonly TypingQueueService _queueService;
     private readonly LogService _log;
     private readonly TypingSessionCoordinator _coordinator;
+    private readonly TargetGuard _targetGuard;
     private readonly Func<int, CancellationToken, Task> _delayAsync;
 
     private TypingSessionLease? _activeLease;
     private Guid? _activeBlockId;
     private DateTime _sessionStartedAt;
     private TypingState _stateBeforePause = TypingState.Digitando;
+
+    public int ResumeCountdownSeconds { get; set; } = 2;
+    public TargetGuard TargetGuard => _targetGuard;
 
     /// <summary>
     /// Callback de UI para blocos em PartiallySent / Interrupted / Failed (§1.2 nota ⁴).
@@ -55,6 +59,12 @@ public sealed class MainViewModel : ObservableObject
     /// O padrão quando nenhum handler de UI está conectado é Cancelar (nunca pula em silêncio).
     /// </summary>
     public Func<PreflightReport, PreflightDecision>? ConfirmPreflightUnsupported { get; set; }
+
+    /// <summary>
+    /// Callback quando o usuário retoma após perda de destino e o HWND mudou (§3.3):
+    /// "O destino mudou. Usar a nova janela como destino?". Retorna true somente com confirmação explícita.
+    /// </summary>
+    public Func<TargetAnchor, TargetAnchor, bool>? ConfirmTargetChanged { get; set; }
 
     private int _skippedUnits;
     private int _failedUnits;
@@ -89,16 +99,17 @@ public sealed class MainViewModel : ObservableObject
         TypingState.AguardandoContagem => "Aguardando contagem regressiva",
         TypingState.Digitando => "Digitando",
         TypingState.Pausado => "Pausado",
+        TypingState.PausadoDestinoPerdido => "Pausado: destino perdido",
         TypingState.Concluido => "Concluído",
         TypingState.Cancelado => "Cancelado",
         TypingState.Erro => "Erro",
         _ => State.ToString()
     };
 
-    public bool IsBusy => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado || _coordinator.IsActive;
+    public bool IsBusy => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado or TypingState.PausadoDestinoPerdido || _coordinator.IsActive;
     public bool CanEditQueue => !IsBusy;
-    public bool CanPause => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado;
-    public string PauseResumeButtonText => State == TypingState.Pausado ? "CONTINUAR" : "PAUSAR";
+    public bool CanPause => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado or TypingState.PausadoDestinoPerdido;
+    public string PauseResumeButtonText => State is TypingState.Pausado or TypingState.PausadoDestinoPerdido ? "CONTINUAR" : "PAUSAR";
 
     // --- Fila ---
     public bool HasNextBlock => _queueService.Current is not null;
@@ -197,7 +208,8 @@ public sealed class MainViewModel : ObservableObject
         TypingQueueService queueService,
         LogService log,
         TypingSessionCoordinator? coordinator = null,
-        Func<int, CancellationToken, Task>? delayAsync = null)
+        Func<int, CancellationToken, Task>? delayAsync = null,
+        TargetGuard? targetGuard = null)
     {
         _typingService = typingService;
         _activeWindowService = activeWindowService;
@@ -208,6 +220,7 @@ public sealed class MainViewModel : ObservableObject
         _log = log;
         _coordinator = coordinator ?? new TypingSessionCoordinator(hotkeyService, log);
         _delayAsync = delayAsync ?? Task.Delay;
+        _targetGuard = targetGuard ?? new TargetGuard(Win32ForegroundWindowProvider.Instance, log);
 
         _coordinator.ActiveChanged += active =>
         {
@@ -423,13 +436,13 @@ public sealed class MainViewModel : ObservableObject
             }
             CountdownText = string.Empty;
 
-            if (Settings.ValidateTargetWindow)
+            if (Settings.EnableTargetGuard || Settings.ValidateTargetWindow)
             {
-                bool matches = _activeWindowService.MatchesExpectedBrowser(Settings.ExpectedBrowser, out var actual);
-                if (!matches)
+                var anchorResult = _targetGuard.TryCaptureAnchor(Settings.ValidateTargetWindow, Settings.ExpectedBrowser);
+                if (!anchorResult.IsValid)
                 {
                     State = TypingState.Erro;
-                    StatusMessage = $"A janela ativa ({actual ?? "desconhecida"}) não corresponde ao destino configurado ({Settings.ExpectedBrowser}).";
+                    StatusMessage = anchorResult.ErrorMessage ?? "A janela ativa não é um destino válido.";
                     _log.Warn(StatusMessage);
                     return;
                 }
@@ -495,10 +508,13 @@ public sealed class MainViewModel : ObservableObject
                 FallbackUnsupportedToUnicode = fallbackUnicode,
                 PreserveOriginalIndentation = baseOptions.PreserveOriginalIndentation,
                 IndentationStrategy = baseOptions.IndentationStrategy,
-                Substitutions = baseOptions.Substitutions
+                Substitutions = baseOptions.Substitutions,
+                BeforeUnitAsync = Settings.EnableTargetGuard
+                    ? (unitIdx, ct) => CheckTargetGuardBeforeUnitAsync(lease, unitIdx, ct)
+                    : null
             };
 
-            var progress = new Progress<TypingProgress>(OnProgress);
+            var progress = new Helpers.DirectProgress<TypingProgress>(OnProgress);
 
             _log.Info("Digitação iniciada");
             await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token)
@@ -553,8 +569,26 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            _targetGuard.StopMonitoring();
             _activeBlockId = null;
         }
+    }
+
+    private Task CheckTargetGuardBeforeUnitAsync(TypingSessionLease lease, int unitIndex, CancellationToken ct)
+    {
+        var check = _targetGuard.CheckBeforeUnit(unitIndex, Settings.Features.TargetGuardStrict);
+        if (check.Status == TargetCheckStatus.TargetLost)
+        {
+            _stateBeforePause = TypingState.Digitando;
+            lease.PauseSession();
+            if (_activeBlockId.HasValue)
+            {
+                _queueService.PauseOrResumeBlock(_activeBlockId.Value);
+            }
+            State = TypingState.PausadoDestinoPerdido;
+            StatusMessage = "Pausado: destino perdido. Volte à janela de destino e clique em CONTINUAR.";
+        }
+        return Task.CompletedTask;
     }
 
     private void AddHistoryEntry(Guid sessionId, Guid blockId, int blockOrder, int characterCount, bool completed, double durationSeconds)
@@ -620,6 +654,63 @@ public sealed class MainViewModel : ObservableObject
             _log.Info(_stateBeforePause == TypingState.AguardandoContagem
                 ? "Contagem regressiva retomada pelo usuário."
                 : "Digitação retomada pelo usuário.");
+        }
+        else if (State == TypingState.PausadoDestinoPerdido)
+        {
+            _ = ResumeAfterTargetLostAsync(lease);
+        }
+    }
+
+    public async Task ResumeAfterTargetLostAsync(TypingSessionLease lease)
+    {
+        if (State != TypingState.PausadoDestinoPerdido) return;
+        var token = lease.Token;
+
+        try
+        {
+            int seconds = Math.Max(0, ResumeCountdownSeconds);
+            for (int i = seconds; i > 0; i--)
+            {
+                CountdownText = $"Retomando em {i}...";
+                StatusMessage = "Clique na janela de destino agora para retomar...";
+                await _delayAsync(1000, token).ConfigureAwait(true);
+            }
+            CountdownText = string.Empty;
+
+            var previousAnchor = _targetGuard.CurrentAnchor;
+            var candidate = _targetGuard.TryCaptureAnchor(Settings.ValidateTargetWindow, Settings.ExpectedBrowser);
+            if (!candidate.IsValid || candidate.Anchor is null)
+            {
+                StatusMessage = candidate.ErrorMessage ?? "Destino inválido ao retomar. Permanece pausado.";
+                _log.Warn(StatusMessage);
+                return;
+            }
+
+            if (previousAnchor is not null && candidate.Anchor.Hwnd != previousAnchor.Hwnd)
+            {
+                bool accepted = ConfirmTargetChanged?.Invoke(previousAnchor, candidate.Anchor) ?? false;
+                if (!accepted)
+                {
+                    // Restaura a âncora original e permanece pausado.
+                    _targetGuard.AcceptNewAnchor(previousAnchor);
+                    StatusMessage = "Retomada cancelada: o destino mudou e não foi confirmado.";
+                    _log.Info(StatusMessage);
+                    return;
+                }
+            }
+
+            if (_activeBlockId.HasValue)
+            {
+                _queueService.PauseOrResumeBlock(_activeBlockId.Value);
+            }
+            State = TypingState.Digitando;
+            StatusMessage = "Digitando...";
+            _log.Info("Digitação retomada após revalidação do destino.");
+            lease.ResumeSession();
+        }
+        catch (OperationCanceledException)
+        {
+            CountdownText = string.Empty;
         }
     }
 

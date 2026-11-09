@@ -6,6 +6,7 @@ public enum TypingState
     AguardandoContagem,
     Digitando,
     Pausado,
+    PausadoDestinoPerdido,
     Concluido,
     Cancelado,
     Erro
