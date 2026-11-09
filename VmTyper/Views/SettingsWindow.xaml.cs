@@ -4,9 +4,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using VmTyper.Models;
 using VmTyper.Services;
+using VmTyper.Services.Persistence;
 using InputMethod = VmTyper.Models.InputMethod;
 using MessageBox = System.Windows.MessageBox;
 using Button = System.Windows.Controls.Button;
+using ComboBox = System.Windows.Controls.ComboBox;
 
 namespace VmTyper.Views;
 
@@ -29,6 +31,17 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _settingsService = settingsService;
         _working = _settingsService.Load();
+
+        if (_settingsService.LastLoadResult is { Status: LoadStatus.Corrupt } corrupt)
+        {
+            MessageBox.Show(
+                this,
+                $"O arquivo de configurações não pôde ser lido e foi preservado em:\n{corrupt.PreservedCorruptPath}\n\nAs configurações padrão foram carregadas para edição.",
+                "Configurações corrompidas",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         SubstitutionsList.ItemsSource = _substitutions;
         LoadIntoUi(_working);
 
@@ -37,63 +50,98 @@ public partial class SettingsWindow : Window
 
     private void LoadIntoUi(AppSettings s)
     {
-        CharDelayBox.Text = s.CharDelayMs.ToString();
-        EnterDelayBox.Text = s.EnterDelayMs.ToString();
-        CountdownBox.Text = s.CountdownSeconds.ToString();
+        var form = SettingsMapper.ToFormState(s);
 
-        MethodCombo.SelectedIndex = s.Method switch
-        {
-            InputMethod.Automatico => 0,
-            InputMethod.TecladoFisico => 1,
-            InputMethod.Unicode => 2,
-            _ => 0
-        };
+        CharDelayBox.Text = form.CharDelayText;
+        EnterDelayBox.Text = form.EnterDelayText;
+        CountdownBox.Text = form.CountdownText;
 
-        PreserveIndentationCheck.IsChecked = s.PreserveOriginalIndentation;
+        SelectComboByTag(MethodCombo, form.MethodTag);
+        SelectOrSetComboByTag(TargetLayoutCombo, form.TargetLayoutTag);
+
+        PreserveIndentationCheck.IsChecked = form.PreserveOriginalIndentation;
 
         _substitutions.Clear();
-        foreach (var sub in s.CharacterSubstitutions)
+        foreach (var sub in form.Substitutions)
         {
-            _substitutions.Add(new CharacterSubstitution
-            {
-                From = sub.From,
-                To = sub.To,
-                Mode = sub.Mode,
-                ComboShift = sub.ComboShift,
-                ComboCtrl = sub.ComboCtrl,
-                ComboAlt = sub.ComboAlt,
-                ComboVirtualKey = sub.ComboVirtualKey,
-                ComboLabel = sub.ComboLabel
-            });
+            _substitutions.Add(sub);
         }
 
-        _startHotkey = Clone(s.StartHotkey);
-        _pauseHotkey = Clone(s.PauseResumeHotkey);
+        _startHotkey = SettingsMapper.CloneHotkey(form.StartHotkey);
+        _pauseHotkey = SettingsMapper.CloneHotkey(form.PauseResumeHotkey);
         StartHotkeyBox.Text = _startHotkey.ToString();
         PauseHotkeyBox.Text = _pauseHotkey.ToString();
 
-        ValidateWindowCheck.IsChecked = s.ValidateTargetWindow;
-        ExpectedBrowserCombo.SelectedIndex = s.ExpectedBrowser switch
-        {
-            ExpectedBrowser.Nenhum => 0,
-            ExpectedBrowser.Chrome => 1,
-            ExpectedBrowser.Edge => 2,
-            ExpectedBrowser.Firefox => 3,
-            _ => 0
-        };
+        EnableTargetGuardCheck.IsChecked = form.EnableTargetGuard;
+        TargetGuardStrictCheck.IsChecked = form.TargetGuardStrict;
+        ValidateWindowCheck.IsChecked = form.ValidateTargetWindow;
+        SelectComboByTag(ExpectedBrowserCombo, form.ExpectedBrowserTag);
 
-        MinimizeToTrayCheck.IsChecked = s.MinimizeToTray;
-        StartMinimizedCheck.IsChecked = s.StartMinimized;
-        AlwaysOnTopCheck.IsChecked = s.AlwaysOnTop;
-        ClearAfterCompletionCheck.IsChecked = s.ClearTextAfterCompletion;
+        MinimizeToTrayCheck.IsChecked = form.MinimizeToTray;
+        StartMinimizedCheck.IsChecked = form.StartMinimized;
+        AlwaysOnTopCheck.IsChecked = form.AlwaysOnTop;
+        ClearAfterCompletionCheck.IsChecked = form.ClearTextAfterCompletion;
+        SelectComboByTag(QueuePersistenceCombo, form.QueueTextPersistenceTag);
+        DetailedTraceCheck.IsChecked = form.DetailedTrace;
     }
 
-    private static HotkeyDefinition Clone(HotkeyDefinition h) => new()
+    private static void SelectComboByTag(ComboBox combo, string tag)
     {
-        Ctrl = h.Ctrl,
-        Shift = h.Shift,
-        Alt = h.Alt,
-        VirtualKey = h.VirtualKey
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, tag, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+        if (combo.Items.Count > 0) combo.SelectedIndex = 0;
+    }
+
+    private static void SelectOrSetComboByTag(ComboBox combo, string tag)
+    {
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, tag, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+        combo.SelectedIndex = -1;
+        combo.Text = tag;
+    }
+
+    private static string ReadComboTagOrText(ComboBox combo, string fallback)
+    {
+        if (combo.SelectedItem is ComboBoxItem item && item.Tag is string tag && !string.IsNullOrWhiteSpace(tag))
+            return tag;
+        if (!string.IsNullOrWhiteSpace(combo.Text))
+            return combo.Text.Trim();
+        return fallback;
+    }
+
+    private SettingsFormState ReadFromUi() => new()
+    {
+        CharDelayText = CharDelayBox.Text,
+        EnterDelayText = EnterDelayBox.Text,
+        CountdownText = CountdownBox.Text,
+        MethodTag = ReadComboTagOrText(MethodCombo, "Automatico"),
+        TargetLayoutTag = ReadComboTagOrText(TargetLayoutCombo, "HostForeground"),
+        PreserveOriginalIndentation = PreserveIndentationCheck.IsChecked == true,
+        Substitutions = _substitutions.Select(SettingsMapper.CloneSubstitution).ToList(),
+        StartHotkey = SettingsMapper.CloneHotkey(_startHotkey),
+        PauseResumeHotkey = SettingsMapper.CloneHotkey(_pauseHotkey),
+        EnableTargetGuard = EnableTargetGuardCheck.IsChecked == true,
+        TargetGuardStrict = TargetGuardStrictCheck.IsChecked == true,
+        ValidateTargetWindow = ValidateWindowCheck.IsChecked == true,
+        ExpectedBrowserTag = ReadComboTagOrText(ExpectedBrowserCombo, "Nenhum"),
+        QueueTextPersistenceTag = ReadComboTagOrText(QueuePersistenceCombo, "Full"),
+        DetailedTrace = DetailedTraceCheck.IsChecked == true,
+        MinimizeToTray = MinimizeToTrayCheck.IsChecked == true,
+        StartMinimized = StartMinimizedCheck.IsChecked == true,
+        AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true,
+        ClearTextAfterCompletion = ClearAfterCompletionCheck.IsChecked == true
     };
 
     // --- Presets de velocidade (item 7 do escopo) ---
@@ -138,10 +186,6 @@ public partial class SettingsWindow : Window
 
         var modifiers = Keyboard.Modifiers;
 
-        // Captura de combinação para substituição: ao contrário dos
-        // atalhos globais, NÃO exige modificador — a VM pode estar
-        // "quebrada" justamente numa tecla sem modificador nenhum, e o
-        // usuário precisa poder capturar exatamente isso.
         if (_capturingSubstitution is not null)
         {
             var sub = _capturingSubstitution;
@@ -197,11 +241,6 @@ public partial class SettingsWindow : Window
         return string.Join(" + ", parts);
     }
 
-    /// <summary>
-    /// Nome amigável para a tecla capturada, distinguindo explicitamente
-    /// variantes de numpad (o motivo desse recurso existir) de teclas
-    /// equivalentes no teclado principal.
-    /// </summary>
     private static string FriendlyKeyName(Key key) => key switch
     {
         Key.Divide => "/ (numpad)",
@@ -260,70 +299,56 @@ public partial class SettingsWindow : Window
         item.ComboLabel = "Pressione a combinação desejada...";
     }
 
+    private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            "Restaurar todas as configurações para os valores padrão de fábrica?",
+            "Restaurar padrões",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        _working = new AppSettings();
+        LoadIntoUi(_working);
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (!int.TryParse(CharDelayBox.Text, out int charDelay) || charDelay < 0)
+        var form = ReadFromUi();
+        var validation = SettingsMapper.TryBuildSettings(form, _working);
+
+        if (!validation.IsValid || validation.Settings is null)
         {
-            MessageBox.Show(this, "Intervalo entre caracteres inválido.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                this,
+                string.Join("\n", validation.Errors),
+                "Configuração inválida",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
-        if (!int.TryParse(EnterDelayBox.Text, out int enterDelay) || enterDelay < 0)
+
+        if (validation.Warnings.Count > 0)
         {
-            MessageBox.Show(this, "Intervalo após Enter inválido.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            var proceed = MessageBox.Show(
+                this,
+                string.Join("\n\n", validation.Warnings) + "\n\nDeseja salvar mesmo assim?",
+                "Aviso de configuração",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (proceed != MessageBoxResult.Yes) return;
         }
-        if (!int.TryParse(CountdownBox.Text, out int countdown) || countdown < 0)
-        {
-            MessageBox.Show(this, "Contagem regressiva inválida.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
 
-        _working.CharDelayMs = charDelay;
-        _working.EnterDelayMs = enterDelay;
-        _working.CountdownSeconds = countdown;
-
-        _working.Method = ((MethodCombo.SelectedItem as ComboBoxItem)?.Tag as string) switch
-        {
-            "TecladoFisico" => InputMethod.TecladoFisico,
-            "Unicode" => InputMethod.Unicode,
-            _ => InputMethod.Automatico
-        };
-
-        _working.PreserveOriginalIndentation = PreserveIndentationCheck.IsChecked == true;
-
-        _working.CharacterSubstitutions = _substitutions
-            .Where(sub => !string.IsNullOrEmpty(sub.From))
-            .Select(sub => new CharacterSubstitution
-            {
-                From = sub.From,
-                To = sub.To,
-                Mode = sub.Mode,
-                ComboShift = sub.ComboShift,
-                ComboCtrl = sub.ComboCtrl,
-                ComboAlt = sub.ComboAlt,
-                ComboVirtualKey = sub.ComboVirtualKey,
-                ComboLabel = sub.ComboLabel
-            })
-            .ToList();
-
-        _working.StartHotkey = _startHotkey;
-        _working.PauseResumeHotkey = _pauseHotkey;
-
-        _working.ValidateTargetWindow = ValidateWindowCheck.IsChecked == true;
-        _working.ExpectedBrowser = ((ExpectedBrowserCombo.SelectedItem as ComboBoxItem)?.Tag as string) switch
-        {
-            "Chrome" => ExpectedBrowser.Chrome,
-            "Edge" => ExpectedBrowser.Edge,
-            "Firefox" => ExpectedBrowser.Firefox,
-            _ => ExpectedBrowser.Nenhum
-        };
-
-        _working.MinimizeToTray = MinimizeToTrayCheck.IsChecked == true;
-        _working.StartMinimized = StartMinimizedCheck.IsChecked == true;
-        _working.AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true;
-        _working.ClearTextAfterCompletion = ClearAfterCompletionCheck.IsChecked == true;
-
+        _working = validation.Settings;
         _settingsService.Save(_working);
+
+        if (System.Windows.Application.Current is App && App.LogServiceInstance is not null)
+        {
+            App.LogServiceInstance.DetailedTrace = _working.Features.DetailedTrace;
+        }
+
         DialogResult = true;
         Close();
     }

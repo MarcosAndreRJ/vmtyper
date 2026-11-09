@@ -150,6 +150,7 @@ Como parte da revisão final deste projeto, dois testes ponta-a-ponta foram exec
    - Use **Teste de Teclado** para isolar quais caracteres especificamente falham, sem precisar reenviar o texto inteiro.
    - Se o navegador estiver rodando **elevado** ("Executar como administrador") e o VmTyper não, o Windows bloqueia a injeção de teclado por UIPI — nesse caso, rode o VmTyper também como administrador.
 6. Ative **Segurança → Validar navegador de destino** para reduzir o risco de digitar na janela errada (o Notepad da VM não é uma janela real do host, então a validação é feita sobre o processo do navegador — Chrome/Edge/Firefox).
+7. **Proteção de foco (`TargetGuard`) e limitações conhecidas:** por padrão, o VmTyper ancora o `HWND` raiz (`GA_ROOT`) e o `PID` da janela em primeiro plano ao fim da contagem regressiva e verifica (via hook `EVENT_SYSTEM_FOREGROUND` + checagem síncrona antes de cada unidade) se a janela de destino continua ativa, pausando imediatamente em caso de perda de foco. Limitações: o guard detecta troca de janela de topo no host; não detecta troca de aba quando o título da janela não muda, mudança de foco entre frames/campos dentro da mesma página nem se a VM convidada está com o foco interno no campo correto.
 
 ## 6. Revisão final (compilação, concorrência, foco, mapeamento, cancelamento)
 
