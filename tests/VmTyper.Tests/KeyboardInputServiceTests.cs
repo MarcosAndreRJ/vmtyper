@@ -191,7 +191,7 @@ public sealed class KeyboardInputServiceTests : IDisposable
             $"Depois da tecla morta veio 0x{(dead + 1 < downs.Count ? downs[dead + 1] : 0):X2}, não Espaço.");
     }
 
-    [KnownDefectFact("N3")]
+    [Fact]
     [Trait("Known", "N3")]
     public async Task DiagnosticsAndMainSession_CannotRunConcurrently()
     {

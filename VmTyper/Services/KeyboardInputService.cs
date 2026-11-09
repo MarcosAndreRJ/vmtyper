@@ -73,6 +73,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
     private readonly LogService _log;
     private readonly IInputInjector _injector;
     private readonly IKeyboardLayoutProvider _layoutProvider;
+    private int _isTyping;
 
     internal KeyboardInputService(
         KeyboardMappingService mapping,
@@ -87,6 +88,28 @@ public sealed class KeyboardInputService : IKeyboardInputService
     }
 
     public async Task TypeTextAsync(
+        string text,
+        TypingOptions options,
+        IProgress<TypingProgress>? progress,
+        PauseToken pauseToken,
+        CancellationToken cancellationToken)
+    {
+        if (Interlocked.CompareExchange(ref _isTyping, 1, 0) != 0)
+        {
+            throw new InvalidOperationException("Já existe uma sessão de digitação ativa no motor.");
+        }
+
+        try
+        {
+            await TypeTextCoreAsync(text, options, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isTyping, 0);
+        }
+    }
+
+    private async Task TypeTextCoreAsync(
         string text,
         TypingOptions options,
         IProgress<TypingProgress>? progress,

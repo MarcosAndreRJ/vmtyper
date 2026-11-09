@@ -18,6 +18,7 @@ public partial class App : System.Windows.Application
     private IKeyboardInputService? _typingService;
     private ActiveWindowService? _activeWindowService;
     private GlobalHotkeyService? _hotkeyService;
+    private TypingSessionCoordinator? _coordinator;
     private TrayIconService? _trayIconService;
     private MainViewModel? _mainViewModel;
 
@@ -26,6 +27,7 @@ public partial class App : System.Windows.Application
     public static SettingsService SettingsServiceInstance => ((App)Current)._settingsService!;
     public static ActiveWindowService ActiveWindowServiceInstance => ((App)Current)._activeWindowService!;
     public static GlobalHotkeyService HotkeyServiceInstance => ((App)Current)._hotkeyService!;
+    public static TypingSessionCoordinator CoordinatorInstance => ((App)Current)._coordinator!;
     public static IKeyboardInputService TypingServiceInstance => ((App)Current)._typingService!;
     public static TrayIconService TrayIconServiceInstance => ((App)Current)._trayIconService!;
 
@@ -58,9 +60,10 @@ public partial class App : System.Windows.Application
         mainWindow.SourceInitialized += (_, _) =>
         {
             _hotkeyService.Initialize();
+            _coordinator = new TypingSessionCoordinator(_hotkeyService, _logService);
             _mainViewModel = new MainViewModel(
                 _typingService, _activeWindowService, _settingsService,
-                _historyService, _hotkeyService, _queueService, _logService);
+                _historyService, _hotkeyService, _queueService, _logService, _coordinator);
             mainWindow.AttachViewModel(_mainViewModel);
         };
 

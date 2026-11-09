@@ -29,6 +29,9 @@ public sealed class TypingQueueService
 
     public ObservableCollection<TextBlockItem> Blocks { get; } = new();
 
+    /// <summary>Quando verdadeiro (sessão ativa no coordenador), bloqueia qualquer mutação da fila.</summary>
+    public bool IsLocked { get; set; }
+
     /// <summary>Disparado após qualquer mutação relevante da fila (para a UI atualizar rótulos/resumos).</summary>
     public event Action? Changed;
 

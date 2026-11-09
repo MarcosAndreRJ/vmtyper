@@ -11,14 +11,11 @@ using VmTyper;
 
 public partial class DiagnosticsWindow : Window
 {
-    private const int HotkeyIdDiagnosticsCancel = 103;
-
     private readonly IKeyboardInputService _typingService;
     private readonly LogService _log;
-    private readonly GlobalHotkeyService _hotkeyService;
+    private readonly TypingSessionCoordinator _coordinator;
 
-    private CancellationTokenSource? _cts;
-    private bool _running;
+    private TypingSessionLease? _activeLease;
 
     private const string DefaultTestText =
         "Teste:\n" +
@@ -29,32 +26,33 @@ public partial class DiagnosticsWindow : Window
         "ÁÀÃÂÉÊÍÓÔÕÚÇ\n" +
         "! @ # $ % ¨ & * ( ) - _ = +";
 
-    public DiagnosticsWindow(IKeyboardInputService typingService, LogService log, GlobalHotkeyService hotkeyService)
+    public DiagnosticsWindow(IKeyboardInputService typingService, LogService log, TypingSessionCoordinator coordinator)
     {
         InitializeComponent();
         _typingService = typingService;
         _log = log;
-        _hotkeyService = hotkeyService;
+        _coordinator = coordinator;
 
         TestTextBox.Text = DefaultTestText;
         LogListBox.ItemsSource = _log.Lines;
 
         Closing += (_, _) =>
         {
-            _cts?.Cancel();
-            if (_hotkeyService.IsRegistered(HotkeyIdDiagnosticsCancel))
-                _hotkeyService.UnregisterHotkey(HotkeyIdDiagnosticsCancel);
+            _activeLease?.Cancel();
         };
     }
 
     private async void SendTest_Click(object sender, RoutedEventArgs e)
     {
-        if (_running) return;
-        _running = true;
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        using var lease = _coordinator.TryBegin("Diagnostics");
+        if (lease is null)
+        {
+            StatusText.Text = "Já existe uma sessão de digitação ativa.";
+            return;
+        }
 
-        _hotkeyService.RegisterHotkey(HotkeyIdDiagnosticsCancel, 0, Win32.VK_ESCAPE, () => _cts?.Cancel());
+        _activeLease = lease;
+        var token = lease.Token;
 
         try
         {
@@ -62,6 +60,7 @@ public partial class DiagnosticsWindow : Window
             {
                 StatusText.Text = $"Iniciando em {i}...";
                 await Task.Delay(1000, token);
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token);
             }
             StatusText.Text = "Digitando teste...";
 
@@ -80,10 +79,9 @@ public partial class DiagnosticsWindow : Window
                 DiagnosticMode = true,
                 Substitutions = App.SettingsServiceInstance.Load().CharacterSubstitutions
             };
-            var pauseTokenSource = new Helpers.PauseTokenSource();
 
             _log.Info("=== Início do teste de diagnóstico ===");
-            await _typingService.TypeTextAsync(TestTextBox.Text, options, null, pauseTokenSource.Token, token);
+            await _typingService.TypeTextAsync(TestTextBox.Text, options, null, lease.Pause, token);
             _log.Info("=== Fim do teste de diagnóstico ===");
 
             StatusText.Text = "Teste concluído.";
@@ -93,18 +91,19 @@ public partial class DiagnosticsWindow : Window
             StatusText.Text = "Teste cancelado.";
             _log.Info("Teste de diagnóstico cancelado pelo usuário.");
         }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Erro: {ex.Message}";
+            _log.Error("Erro no teste de diagnóstico: " + ex.Message);
+        }
         finally
         {
-            if (_hotkeyService.IsRegistered(HotkeyIdDiagnosticsCancel))
-                _hotkeyService.UnregisterHotkey(HotkeyIdDiagnosticsCancel);
-            _cts?.Dispose();
-            _cts = null;
-            _running = false;
+            _activeLease = null;
         }
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
-        _cts?.Cancel();
+        _activeLease?.Cancel();
     }
 }

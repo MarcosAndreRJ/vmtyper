@@ -26,25 +26,15 @@ public sealed class MainViewModel : ObservableObject
     private readonly ActiveWindowService _activeWindowService;
     private readonly SettingsService _settingsService;
     private readonly HistoryService _historyService;
-    private readonly GlobalHotkeyService _hotkeyService;
+    private readonly IHotkeyRegistrar _hotkeyService;
     private readonly TypingQueueService _queueService;
     private readonly LogService _log;
+    private readonly TypingSessionCoordinator _coordinator;
+    private readonly Func<int, CancellationToken, Task> _delayAsync;
 
-    private CancellationTokenSource? _cts;
-    private PauseTokenSource? _pauseTokenSource;
+    private TypingSessionLease? _activeLease;
     private DateTime _sessionStartedAt;
-
-    /// <summary>
-    /// Trava atômica de reentrância: 0 = ocioso, 1 = existe uma execução em
-    /// andamento (contagem, digitando ou pausado). Verificada com
-    /// Interlocked.CompareExchange logo na primeira linha de StartAsync,
-    /// antes de qualquer outra leitura de estado — garante por construção
-    /// que botão + hotkey, ou hotkey pressionado duas vezes em sequência
-    /// rápida, nunca conseguem iniciar duas Tasks de digitação
-    /// simultâneas, mesmo que a UI (IsBusy) ainda não tenha sido
-    /// atualizada no instante exato da segunda tentativa.
-    /// </summary>
-    private int _isRunning;
+    private TypingState _stateBeforePause = TypingState.Digitando;
 
     public AppSettings Settings { get; private set; }
 
@@ -62,6 +52,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(StateText));
                 OnPropertyChanged(nameof(IsBusy));
+                OnPropertyChanged(nameof(CanEditQueue));
                 OnPropertyChanged(nameof(CanPause));
                 OnPropertyChanged(nameof(PauseResumeButtonText));
                 CommandManager.InvalidateRequerySuggested();
@@ -81,8 +72,9 @@ public sealed class MainViewModel : ObservableObject
         _ => State.ToString()
     };
 
-    public bool IsBusy => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado;
-    public bool CanPause => State is TypingState.Digitando or TypingState.Pausado;
+    public bool IsBusy => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado || _coordinator.IsActive;
+    public bool CanEditQueue => !IsBusy;
+    public bool CanPause => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado;
     public string PauseResumeButtonText => State == TypingState.Pausado ? "CONTINUAR" : "PAUSAR";
 
     // --- Fila ---
@@ -178,9 +170,11 @@ public sealed class MainViewModel : ObservableObject
         ActiveWindowService activeWindowService,
         SettingsService settingsService,
         HistoryService historyService,
-        GlobalHotkeyService hotkeyService,
+        IHotkeyRegistrar hotkeyService,
         TypingQueueService queueService,
-        LogService log)
+        LogService log,
+        TypingSessionCoordinator? coordinator = null,
+        Func<int, CancellationToken, Task>? delayAsync = null)
     {
         _typingService = typingService;
         _activeWindowService = activeWindowService;
@@ -189,6 +183,16 @@ public sealed class MainViewModel : ObservableObject
         _hotkeyService = hotkeyService;
         _queueService = queueService;
         _log = log;
+        _coordinator = coordinator ?? new TypingSessionCoordinator(hotkeyService, log);
+        _delayAsync = delayAsync ?? Task.Delay;
+
+        _coordinator.ActiveChanged += active =>
+        {
+            _queueService.IsLocked = active;
+            OnPropertyChanged(nameof(IsBusy));
+            OnPropertyChanged(nameof(CanEditQueue));
+            CommandManager.InvalidateRequerySuggested();
+        };
 
         LogLines = log.Lines;
         Settings = _settingsService.Load();
@@ -260,32 +264,31 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>
     /// Digita exclusivamente o próximo bloco elegível da fila (1 acionamento
     /// = 1 bloco). Chamado tanto pelo botão DIGITAR quanto pelo hotkey
-    /// global. A trava atômica <see cref="_isRunning"/> é verificada aqui,
-    /// antes de qualquer outra coisa: se dois acionamentos chegarem quase
-    /// juntos (botão + hotkey, ou hotkey pressionado duas vezes rápido),
-    /// somente o primeiro passa — o segundo é descartado imediatamente,
-    /// sem nunca chegar a criar um novo CancellationTokenSource ou iniciar
-    /// uma segunda Task de digitação.
+    /// global. O <see cref="TypingSessionCoordinator"/> garante exclusividade
+    /// por processo (entre a janela principal e a de diagnóstico) e é o único
+    /// responsável por registrar/desregistrar o ESC global.
     /// </summary>
-    private async Task StartAsync()
+    public async Task StartAsync()
     {
-        if (Interlocked.CompareExchange(ref _isRunning, 1, 0) != 0)
+        using var lease = _coordinator.TryBegin("Main");
+        if (lease is null)
         {
             _log.Info("Acionamento ignorado: já existe uma digitação em andamento.");
             return;
         }
 
+        _activeLease = lease;
         try
         {
-            await StartCoreAsync().ConfigureAwait(true);
+            await StartCoreAsync(lease).ConfigureAwait(true);
         }
         finally
         {
-            Interlocked.Exchange(ref _isRunning, 0);
+            _activeLease = null;
         }
     }
 
-    private async Task StartCoreAsync()
+    private async Task StartCoreAsync(TypingSessionLease lease)
     {
         var next = _queueService.PeekNext();
         if (next is null)
@@ -298,10 +301,7 @@ public sealed class MainViewModel : ObservableObject
 
         Guid blockId = next.Id;
         int blockOrder = next.Order;
-
-        _cts = new CancellationTokenSource();
-        _pauseTokenSource = new PauseTokenSource();
-        var token = _cts.Token;
+        var token = lease.Token;
 
         State = TypingState.AguardandoContagem;
         _sessionStartedAt = DateTime.Now;
@@ -313,22 +313,16 @@ public sealed class MainViewModel : ObservableObject
         _log.Info($"Método: {Settings.Method}");
         _log.Info($"Caracteres: {next.Text.Length}");
 
-        // O ESC é registrado como hotkey global já a partir daqui, cobrindo
-        // tanto a contagem regressiva quanto a digitação em si — o usuário
-        // pode desistir a qualquer momento depois de acionar o bloco.
-        bool cancelHotkeyRegistered = _hotkeyService.RegisterHotkey(
-            HotkeyIdCancel, 0, Native.Win32.VK_ESCAPE, Cancel);
-        if (!cancelHotkeyRegistered)
-            _log.Warn("Não foi possível registrar ESC como tecla de emergência (pode já estar em uso).");
-
         try
         {
             int seconds = Math.Max(0, Settings.CountdownSeconds);
             for (int i = seconds; i > 0; i--)
             {
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token).ConfigureAwait(true);
                 CountdownText = $"Iniciando em {i}...";
                 StatusMessage = $"Bloco {blockOrder}: clique no destino (janela do navegador / VM) agora.";
-                await Task.Delay(1000, token).ConfigureAwait(true);
+                await _delayAsync(1000, token).ConfigureAwait(true);
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token).ConfigureAwait(true);
             }
             CountdownText = string.Empty;
 
@@ -372,7 +366,7 @@ public sealed class MainViewModel : ObservableObject
             var progress = new Progress<TypingProgress>(OnProgress);
 
             _log.Info("Digitação iniciada");
-            await _typingService.TypeTextAsync(block.Text, options, progress, _pauseTokenSource.Token, token)
+            await _typingService.TypeTextAsync(block.Text, options, progress, lease.Pause, token)
                 .ConfigureAwait(true);
 
             double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
@@ -406,15 +400,6 @@ public sealed class MainViewModel : ObservableObject
             // "Digitando" para sempre nem ser considerado concluído.
             _queueService.CancelBlock(blockId);
         }
-        finally
-        {
-            if (cancelHotkeyRegistered)
-                _hotkeyService.UnregisterHotkey(HotkeyIdCancel);
-
-            _cts?.Dispose();
-            _cts = null;
-            _pauseTokenSource = null;
-        }
     }
 
     private void AddHistoryEntry(int blockOrder, int characterCount, bool completed, double durationSeconds)
@@ -441,43 +426,46 @@ public sealed class MainViewModel : ObservableObject
         CpsText = p.CharactersPerSecond.ToString("0.0");
     }
 
-    private void TogglePause()
+    public void TogglePause()
     {
-        if (_pauseTokenSource is null) return;
+        var lease = _activeLease;
+        if (lease is null) return;
 
-        if (State == TypingState.Digitando)
+        if (State is TypingState.Digitando or TypingState.AguardandoContagem)
         {
-            _pauseTokenSource.Pause();
+            _stateBeforePause = State;
+            lease.PauseSession();
             State = TypingState.Pausado;
-            StatusMessage = "Pausado. Clique em CONTINUAR para retomar.";
-            _log.Info("Digitação pausada pelo usuário.");
+            StatusMessage = _stateBeforePause == TypingState.AguardandoContagem
+                ? "Contagem pausada. Clique em CONTINUAR para retomar."
+                : "Pausado. Clique em CONTINUAR para retomar.";
+            _log.Info(_stateBeforePause == TypingState.AguardandoContagem
+                ? "Contagem regressiva pausada pelo usuário."
+                : "Digitação pausada pelo usuário.");
         }
         else if (State == TypingState.Pausado)
         {
-            _pauseTokenSource.Resume();
-            State = TypingState.Digitando;
-            StatusMessage = "Digitando...";
-            _log.Info("Digitação retomada pelo usuário.");
+            lease.ResumeSession();
+            State = _stateBeforePause;
+            StatusMessage = _stateBeforePause == TypingState.AguardandoContagem
+                ? "Retomando contagem regressiva..."
+                : "Digitando...";
+            _log.Info(_stateBeforePause == TypingState.AguardandoContagem
+                ? "Contagem regressiva retomada pelo usuário."
+                : "Digitação retomada pelo usuário.");
         }
     }
 
-    private void Cancel()
+    public void Cancel()
     {
-        if (_cts is { IsCancellationRequested: false })
-        {
-            _cts.Cancel();
-            // Se estava pausado, libera a espera para que a exceção de
-            // cancelamento seja observada imediatamente.
-            _pauseTokenSource?.Resume();
-        }
+        _activeLease?.Cancel();
     }
 
     public void Shutdown()
     {
-        Cancel();
+        _coordinator.CancelAndWait(TimeSpan.FromSeconds(2));
         _queueService.Save();
         _hotkeyService.UnregisterHotkey(HotkeyIdStart);
         _hotkeyService.UnregisterHotkey(HotkeyIdPauseResume);
-        _hotkeyService.UnregisterHotkey(HotkeyIdCancel);
     }
 }

@@ -14,12 +14,16 @@ public sealed class HistoryService
     private readonly string _filePath;
 
     public HistoryService()
-    {
-        var dir = Path.Combine(
+        : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VmTyper");
-        Directory.CreateDirectory(dir);
-        _filePath = Path.Combine(dir, "history.json");
+            "VmTyper", "history.json"))
+    {
+    }
+
+    internal HistoryService(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        _filePath = filePath;
     }
 
     public List<TypingSession> Load()

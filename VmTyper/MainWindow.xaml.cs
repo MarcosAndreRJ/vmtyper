@@ -91,7 +91,7 @@ public partial class MainWindow : Window
 
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
     {
-        var window = new DiagnosticsWindow(App.TypingServiceInstance, App.LogServiceInstance, App.HotkeyServiceInstance)
+        var window = new DiagnosticsWindow(App.TypingServiceInstance, App.LogServiceInstance, App.CoordinatorInstance)
         {
             Owner = this
         };
