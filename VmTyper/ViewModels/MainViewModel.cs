@@ -16,6 +16,13 @@ namespace VmTyper.ViewModels;
 /// Não contém nenhuma chamada P/Invoke diretamente — toda a interação com
 /// o Windows passa pelos serviços injetados.
 /// </summary>
+public enum PreflightDecision
+{
+    Cancel,
+    SkipUnsupported,
+    FallbackToUnicode
+}
+
 public sealed class MainViewModel : ObservableObject
 {
     public const int HotkeyIdStart = 1;
@@ -42,6 +49,15 @@ public sealed class MainViewModel : ObservableObject
     /// Recebe o bloco e retorna: null = cancelar; false = reenviar do início (padrão); true = continuar de SentUpToIndex.
     /// </summary>
     public Func<TextBlockItem, bool?>? ConfirmPartialResume { get; set; }
+
+    /// <summary>
+    /// Callback de pré-voo quando o plano contém unidades Unsupported (§2.1 E).
+    /// O padrão quando nenhum handler de UI está conectado é Cancelar (nunca pula em silêncio).
+    /// </summary>
+    public Func<PreflightReport, PreflightDecision>? ConfirmPreflightUnsupported { get; set; }
+
+    private int _skippedUnits;
+    private int _failedUnits;
 
     public AppSettings Settings { get; private set; }
 
@@ -430,6 +446,40 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
+            var baseOptions = new TypingOptions
+            {
+                CharDelayMs = Settings.CharDelayMs,
+                EnterDelayMs = Settings.EnterDelayMs,
+                Method = Settings.Method,
+                TargetLayout = Settings.TargetLayout,
+                PreserveOriginalIndentation = Settings.PreserveOriginalIndentation,
+                IndentationStrategy = IndentationResetStrategy.Auto,
+                Substitutions = Settings.CharacterSubstitutions
+            };
+
+            // §2.1 (E): Pré-voo — se houver unidades Unsupported, a sessão não começa em silêncio.
+            var preflight = _typingService.Plan(textToType, baseOptions);
+            bool fallbackUnicode = false;
+            if (preflight.UnsupportedCount > 0)
+            {
+                var decision = ConfirmPreflightUnsupported?.Invoke(preflight) ?? PreflightDecision.Cancel;
+                if (decision == PreflightDecision.Cancel)
+                {
+                    State = TypingState.Cancelado;
+                    StatusMessage = $"Envio cancelado no pré-voo ({preflight.UnsupportedCount} unidade(s) não suportada(s)).";
+                    _log.Info(StatusMessage);
+                    return;
+                }
+                fallbackUnicode = decision == PreflightDecision.FallbackToUnicode;
+            }
+
+            if (preflight.TotalUnits > 0)
+            {
+                TotalCharacters = preflight.TotalUnits;
+            }
+            _skippedUnits = 0;
+            _failedUnits = 0;
+
             _queueService.BeginTyping(blockId, sessionId);
             _activeBlockId = blockId;
             typingStarted = true;
@@ -438,12 +488,14 @@ public sealed class MainViewModel : ObservableObject
 
             var options = new TypingOptions
             {
-                CharDelayMs = Settings.CharDelayMs,
-                EnterDelayMs = Settings.EnterDelayMs,
-                Method = Settings.Method,
-                PreserveOriginalIndentation = Settings.PreserveOriginalIndentation,
-                IndentationStrategy = IndentationResetStrategy.Auto,
-                Substitutions = Settings.CharacterSubstitutions
+                CharDelayMs = baseOptions.CharDelayMs,
+                EnterDelayMs = baseOptions.EnterDelayMs,
+                Method = baseOptions.Method,
+                TargetLayout = baseOptions.TargetLayout,
+                FallbackUnsupportedToUnicode = fallbackUnicode,
+                PreserveOriginalIndentation = baseOptions.PreserveOriginalIndentation,
+                IndentationStrategy = baseOptions.IndentationStrategy,
+                Substitutions = baseOptions.Substitutions
             };
 
             var progress = new Progress<TypingProgress>(OnProgress);
@@ -453,16 +505,29 @@ public sealed class MainViewModel : ObservableObject
                 .ConfigureAwait(true);
 
             double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
-            State = TypingState.Concluido;
-            _log.Info($"Digitação concluída. Caracteres enviados: {TypedCharacters}. Duração: {duration:0.0}s");
+            if (_skippedUnits > 0 || _failedUnits > 0)
+            {
+                // §2.3 (E): conclusão com Skipped > 0 ou Failed > 0 termina como PartiallySent/aviso, nunca Concluído verde.
+                State = TypingState.Erro;
+                string warn = $"Bloco {blockOrder} enviado parcialmente ({TypedCharacters} enviadas, {_skippedUnits} puladas, {_failedUnits} falhas).";
+                StatusMessage = warn;
+                _log.Warn(warn);
+                AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: false, duration);
+                _queueService.CancelBlock(blockId, Math.Max(1, resumeFromIndex + TypedCharacters), sessionId);
+            }
+            else
+            {
+                State = TypingState.Concluido;
+                _log.Info($"Digitação concluída. Unidades enviadas: {TypedCharacters}. Duração: {duration:0.0}s");
 
-            AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: true, duration);
-            _queueService.CompleteBlock(blockId, Settings.ClearTextAfterCompletion, resumeFromIndex + TypedCharacters, sessionId);
+                AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: true, duration);
+                _queueService.CompleteBlock(blockId, Settings.ClearTextAfterCompletion, resumeFromIndex + TypedCharacters, sessionId);
 
-            var upcoming = _queueService.Current;
-            StatusMessage = upcoming is not null
-                ? $"Bloco {blockOrder} enviado. Próximo: Bloco {upcoming.Order}."
-                : "Todos os blocos foram enviados.";
+                var upcoming = _queueService.Current;
+                StatusMessage = upcoming is not null
+                    ? $"Bloco {blockOrder} enviado. Próximo: Bloco {upcoming.Order}."
+                    : "Todos os blocos foram enviados.";
+            }
         }
         catch (OperationCanceledException)
         {
@@ -511,8 +576,10 @@ public sealed class MainViewModel : ObservableObject
 
     private void OnProgress(TypingProgress p)
     {
-        TypedCharacters = p.TypedCharacters;
-        TotalCharacters = p.TotalCharacters;
+        TypedCharacters = p.Sent;
+        TotalCharacters = p.TotalUnits;
+        _skippedUnits = p.Skipped;
+        _failedUnits = p.Failed;
         PercentComplete = p.PercentComplete;
         ElapsedText = p.Elapsed.ToString(@"mm\:ss");
         CpsText = p.CharactersPerSecond.ToString("0.0");

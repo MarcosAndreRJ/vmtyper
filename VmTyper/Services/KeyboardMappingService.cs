@@ -68,6 +68,11 @@ public sealed class KeyboardMappingService
         ['̈'] = '¨',  // trema / diérese
     };
 
+    private static readonly HashSet<char> PotentialDeadLiteralChars = new()
+    {
+        '~', '^', '´', '`', '¨', '\'', '"'
+    };
+
     private readonly IKeyboardLayoutProvider _layoutProvider;
 
     internal KeyboardMappingService(IKeyboardLayoutProvider layoutProvider)
@@ -77,11 +82,75 @@ public sealed class KeyboardMappingService
 
     public IntPtr GetForegroundLayout() => _layoutProvider.GetLayout();
 
+    public IntPtr GetLayout(string? targetLayout) =>
+        string.IsNullOrWhiteSpace(targetLayout) || string.Equals(targetLayout, "HostForeground", StringComparison.OrdinalIgnoreCase)
+            ? _layoutProvider.GetLayout()
+            : _layoutProvider.LoadLayout(targetLayout);
+
+    /// <summary>
+    /// Resolve scan code e flag estendida a partir do VK usando MAPVK_VK_TO_VSC_EX
+    /// (prefixo 0xE0/0xE1 → Extended = true) com fallback para <see cref="Win32.IsExtendedKey"/> (§2.1 G).
+    /// </summary>
+    public (ushort scan, bool extended) ResolveScan(ushort vk, IntPtr layout)
+    {
+        uint vscEx = _layoutProvider.MapVirtualKey(vk, Win32.MAPVK_VK_TO_VSC_EX, layout);
+        if (vscEx == 0)
+        {
+            vscEx = _layoutProvider.MapVirtualKey(vk, Win32.MAPVK_VK_TO_VSC, layout);
+        }
+
+        ushort scan = (ushort)(vscEx & 0xFF);
+        bool prefixExtended = (vscEx & 0xFF00) is 0xE000 or 0xE100;
+        bool extended = prefixExtended || Win32.IsExtendedKey(vk);
+        return (scan, extended);
+    }
+
+    /// <summary>
+    /// Verifica se o caractere <paramref name="c"/> é produzido por uma tecla morta
+    /// literal no layout ativo (N1). Quando verdadeiro, o caractere literal exige
+    /// o envio da tecla morta seguida de Espaço.
+    /// </summary>
+    public bool IsDeadKeyLiteral(char c, byte vk, IntPtr layout)
+    {
+        if (!PotentialDeadLiteralChars.Contains(c)) return false;
+
+        uint mapChar = _layoutProvider.MapVirtualKey(vk, Win32.MAPVK_VK_TO_CHAR, layout);
+        if ((mapChar & 0x80000000u) != 0)
+        {
+            return true;
+        }
+
+        // Alguns layouts (ex.: '^' com Shift+6 no US-Intl ou '¨' com Shift+6 no ABNT2)
+        // têm tecla morta apenas no estado com Shift, enquanto MapVirtualKeyEx(MAPVK_VK_TO_CHAR)
+        // inspeciona apenas o estado sem modificador. Cobrimos esses casos verificando
+        // o KLID / HKL ou a lista de teclas mortas conhecidas do layout.
+        if (c is '~' or '^' or '´' or '`' or '¨')
+        {
+            uint langId = (uint)layout.ToInt64() & 0xFFFF;
+            uint deviceId = ((uint)layout.ToInt64() >> 16) & 0xFFFF;
+            // pt-BR (0x0416) ou US-International (deviceId 0xF001 ou klid 00020409)
+            if (langId == 0x0416 || deviceId == 0xF001 || (langId == 0x0409 && vk == 0x36 && c == '^'))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public MappingResult Resolve(char c, IntPtr layout)
     {
         var direct = TryResolveSingle(c, layout);
         if (direct.HasValue)
         {
+            if (IsDeadKeyLiteral(c, (byte)direct.Value.VirtualKey, layout))
+            {
+                return MappingResult.Ok(new[]
+                {
+                    direct.Value,
+                    new KeyCombo(Win32.VK_SPACE, shift: false, ctrl: false, alt: false)
+                });
+            }
             return MappingResult.Ok(new[] { direct.Value });
         }
 

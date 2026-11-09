@@ -21,10 +21,12 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
 
     private readonly Dictionary<char, (byte vk, byte shiftState)> _chars = new();
     private readonly Dictionary<uint, ushort> _scanByVk = new();
+    private readonly Dictionary<uint, char> _charByVk = new();
     private readonly HashSet<uint> _extendedVks = new();
 
     /// <summary>Teclas mortas deste layout (o caractere que VkKeyScan devolve como tecla morta).</summary>
     public HashSet<char> DeadKeys { get; } = new();
+    private readonly HashSet<uint> _deadVks = new();
 
     public IReadOnlyDictionary<uint, ushort> ScanByVk => _scanByVk;
 
@@ -66,12 +68,27 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
         l.AddChar('`', 0xDB, ShiftState);
         l.AddChar('¨', 0x36, ShiftState);
         l.DeadKeys.UnionWith(new[] { '~', '^', '´', '`', '¨' });
+        l._deadVks.UnionWith(new uint[] { 0xDE, 0xDB });
         l.AddKey('ç', 0xBA, 0x27);
         l.AddKey(',', 0xBC, 0x33);
         l.AddKey('.', 0xBE, 0x34);
         l.AddKey(';', 0xBF, 0x35);
         l.AddKey('-', 0xBD, 0x0C);
         l.AddKey('/', 0xC1, 0x73);
+        return l;
+    }
+
+    /// <summary>Subconjunto do US-International: ' " ~ ^ ` são teclas mortas.</summary>
+    public static FakeKeyboardLayout UsInternational()
+    {
+        var l = new FakeKeyboardLayout();
+        l.AddKey('\'', 0xDE, 0x28);
+        l.AddChar('"', 0xDE, ShiftState);
+        l.AddKey('`', 0xC0, 0x29);
+        l.AddChar('~', 0xC0, ShiftState);
+        l.AddChar('^', 0x36, ShiftState);
+        l.DeadKeys.UnionWith(new[] { '\'', '"', '~', '^', '`' });
+        l._deadVks.UnionWith(new uint[] { 0xDE, 0xC0 });
         return l;
     }
 
@@ -91,7 +108,11 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
         Scan(vk, scan);
     }
 
-    private void AddChar(char c, byte vk, byte shiftState) => _chars[c] = (vk, shiftState);
+    private void AddChar(char c, byte vk, byte shiftState)
+    {
+        _chars[c] = (vk, shiftState);
+        if (shiftState == 0) _charByVk[vk] = c;
+    }
 
     private void Scan(uint vk, ushort scan, bool extended = false)
     {
@@ -109,6 +130,12 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
 
     public uint MapVirtualKey(uint code, uint mapType, IntPtr layout)
     {
+        if (mapType == Win32.MAPVK_VK_TO_CHAR)
+        {
+            uint ch = _charByVk.TryGetValue(code, out char c) ? c : 0u;
+            if (_deadVks.Contains(code)) ch |= 0x80000000u;
+            return ch;
+        }
         if (!_scanByVk.TryGetValue(code, out var scan)) return 0;
         if (mapType == Win32.MAPVK_VK_TO_VSC_EX && _extendedVks.Contains(code)) return 0xE000u | scan;
         return scan;

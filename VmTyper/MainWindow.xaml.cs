@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         ApplyBehaviorSettings();
 
         viewModel.ConfirmPartialResume = ConfirmPartialResumeDialog;
+        viewModel.ConfirmPreflightUnsupported = ConfirmPreflightUnsupportedDialog;
 
         if (App.QueueLoadCorruptPath is { } corruptPath)
         {
@@ -76,15 +77,16 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_isExiting) return;
-
-        if (_viewModel is not null && _viewModel.Settings.MinimizeToTray)
+        if (!_isExiting && _viewModel is not null && _viewModel.Settings.MinimizeToTray)
         {
             e.Cancel = true;
             Hide();
             App.TrayIconServiceInstance.Visible = true;
             return;
         }
+
+        // §2.4 (H5): se houver sessão ativa ao fechar de verdade, cancelar e aguardar até 2 s.
+        App.CoordinatorInstance?.CancelAndWait(TimeSpan.FromSeconds(2));
     }
 
     private bool? ConfirmPartialResumeDialog(TextBlockItem block)
@@ -118,6 +120,35 @@ public partial class MainWindow : Window
             MessageBoxImage.Question,
             MessageBoxResult.OK);
         return simple == MessageBoxResult.OK ? false : null;
+    }
+
+    private PreflightDecision ConfirmPreflightUnsupportedDialog(Services.PreflightReport report)
+    {
+        var summary = string.Join("\n", report.Unsupported
+            .Take(10)
+            .Select(u => $"• Posição #{u.Index} ({u.Category}): {u.Reason}"));
+        if (report.UnsupportedCount > 10)
+        {
+            summary += $"\n… e mais {report.UnsupportedCount - 10} unidade(s).";
+        }
+
+        var res = MessageBox.Show(this,
+            $"O texto contém {report.UnsupportedCount} unidade(s) não suportada(s) no layout físico:\n\n" +
+            $"{summary}\n\n" +
+            $"• Sim: Usar Unicode para essas {report.UnsupportedCount} unidade(s)\n" +
+            $"• Não: Enviar mesmo assim, pulando {report.UnsupportedCount} unidade(s)\n" +
+            $"• Cancelar (padrão): Cancelar envio",
+            "Pré-voo: unidades não suportadas",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+
+        return res switch
+        {
+            MessageBoxResult.Yes => PreflightDecision.FallbackToUnicode,
+            MessageBoxResult.No => PreflightDecision.SkipUnsupported,
+            _ => PreflightDecision.Cancel
+        };
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)

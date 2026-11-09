@@ -13,6 +13,9 @@ internal interface IInputInjector
 
     /// <summary>Código de erro Win32 da última chamada a <see cref="Send"/> que não enviou tudo.</summary>
     int LastError { get; }
+
+    /// <summary>Verifica se uma tecla (modificador) está fisicamente pressionada no momento (GetAsyncKeyState &amp; 0x8000).</summary>
+    bool IsPhysicalKeyDown(ushort vk) => false;
 }
 
 /// <summary>Implementação real: chama SendInput do user32.</summary>
@@ -32,4 +35,6 @@ internal sealed class Win32InputInjector : IInputInjector
         }
         return sent;
     }
+
+    public bool IsPhysicalKeyDown(ushort vk) => (Win32.GetAsyncKeyState(vk) & 0x8000) != 0;
 }

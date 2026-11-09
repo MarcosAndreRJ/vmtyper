@@ -10,6 +10,9 @@ namespace VmTyper.Services;
 /// </summary>
 public interface IKeyboardInputService
 {
+    PreflightReport Plan(string text, TypingOptions options) =>
+        new(Array.Empty<InputUnit>(), 0, 0, 0, Array.Empty<UnsupportedUnitInfo>(), Array.Empty<string>(), Array.Empty<string>());
+
     Task TypeTextAsync(
         string text,
         TypingOptions options,

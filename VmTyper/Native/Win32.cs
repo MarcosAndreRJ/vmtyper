@@ -92,6 +92,12 @@ internal static class Win32
     public const ushort VK_RCONTROL = 0xA3;
     public const ushort VK_LMENU = 0xA4; // Alt esquerdo
     public const ushort VK_RMENU = 0xA5; // Alt direito / AltGr
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_RWIN = 0x5C;
+    public const ushort VK_APPS = 0x5D;
+    public const ushort VK_SNAPSHOT = 0x2C;
+    public const ushort VK_DIVIDE = 0x6F;
+    public const ushort VK_SPACE = 0x20;
     public const ushort VK_RETURN = 0x0D;
     public const ushort VK_TAB = 0x09;
     public const ushort VK_ESCAPE = 0x1B;
@@ -102,14 +108,17 @@ internal static class Win32
     public const ushort VK_DELETE = 0x2E;
 
     /// <summary>
-    /// Teclas que o Windows trata como "estendidas" e que exigem o flag
-    /// KEYEVENTF_EXTENDEDKEY para que o scan code seja interpretado
-    /// corretamente (ex.: Alt/Ctrl direitos, setas, Insert/Delete etc.).
+    /// Tabela de fallback das teclas que o Windows trata como "estendidas" e
+    /// que exigem o flag KEYEVENTF_EXTENDEDKEY (§2.1 G).
     /// </summary>
     public static bool IsExtendedKey(ushort vk) => vk switch
     {
         VK_RMENU => true,
         VK_RCONTROL => true,
+        VK_DIVIDE => true,
+        VK_LWIN or VK_RWIN => true,
+        VK_APPS => true,
+        VK_SNAPSHOT => true,
         0x21 or 0x22 or 0x23 or 0x24 => true, // PageUp/PageDown/End/Home
         0x25 or 0x26 or 0x27 or 0x28 => true, // Setas
         0x2D or 0x2E => true,                  // Insert/Delete
@@ -128,10 +137,21 @@ internal static class Win32
     public static extern uint MapVirtualKeyEx(uint uCode, uint uMapType, IntPtr dwhkl);
 
     public const uint MAPVK_VK_TO_VSC = 0;
+    public const uint MAPVK_VSC_TO_VK = 1;
+    public const uint MAPVK_VK_TO_CHAR = 2;
+    public const uint MAPVK_VSC_TO_VK_EX = 3;
     public const uint MAPVK_VK_TO_VSC_EX = 4;
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetKeyboardLayout(uint idThread);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
+
+    public const uint KLF_NOTELLSHELL = 0x00000080;
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int vKey);
 
     // ---------------------------------------------------------------
     // Janela ativa / processo em primeiro plano

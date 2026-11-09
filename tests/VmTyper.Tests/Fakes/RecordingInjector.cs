@@ -22,10 +22,25 @@ internal sealed class RecordingInjector : IInputInjector
     private readonly object _lock = new();
     private readonly Dictionary<int, uint> _partialCalls = new();
     private readonly List<RecordedInput> _delivered = new();
+    private readonly HashSet<ushort> _physicalKeysDown = new();
 
     public int Calls { get; private set; }
 
     public int LastError { get; private set; }
+
+    public void SetPhysicalKeyDown(ushort vk, bool down = true)
+    {
+        lock (_lock)
+        {
+            if (down) _physicalKeysDown.Add(vk);
+            else _physicalKeysDown.Remove(vk);
+        }
+    }
+
+    public bool IsPhysicalKeyDown(ushort vk)
+    {
+        lock (_lock) return _physicalKeysDown.Contains(vk);
+    }
 
     public IReadOnlyList<RecordedInput> Delivered
     {

@@ -62,4 +62,13 @@ public sealed class TypingOptions
     /// ou digitação — independe do método (Automático/Físico/Unicode).
     /// </summary>
     public IReadOnlyList<CharacterSubstitution> Substitutions { get; init; } = Array.Empty<CharacterSubstitution>();
+
+    /// <summary>Layout de destino ("HostForeground" ou KLID como "00010416" ABNT2, "00020409" US-Intl) (§2.1 N2).</summary>
+    public string TargetLayout { get; init; } = "HostForeground";
+
+    /// <summary>Quando verdadeiro (após decisão no pré-voo §2.1 E), converte unidades Unsupported em Unicode.</summary>
+    public bool FallbackUnsupportedToUnicode { get; init; }
+
+    /// <summary>Callback síncrono opcional invocado imediatamente antes de enviar cada unidade (usado pelo TargetGuard §3.2).</summary>
+    public Func<int, CancellationToken, Task>? BeforeUnitAsync { get; init; }
 }

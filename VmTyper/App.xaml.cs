@@ -93,9 +93,11 @@ public partial class App : System.Windows.Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         _logService?.Error("Exceção não tratada: " + e.Exception.Message);
-        // Garante que nenhum modificador fique preso mesmo em caso de erro
-        // totalmente inesperado na UI thread.
-        Native.Win32.ReleaseAllModifiers();
+        // §2.2 item 6: último recurso baseado no InjectedKeyTracker (nunca solta modificadores por VK às cegas).
+        if (_typingService is KeyboardInputService kis)
+        {
+            kis.EmergencyReleaseTrackedKeys();
+        }
         e.Handled = true;
     }
 
