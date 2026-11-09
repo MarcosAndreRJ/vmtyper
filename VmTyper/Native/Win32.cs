@@ -74,6 +74,12 @@ internal static class Win32
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
+    // Sobrecarga usada por Win32InputInjector: recebe o primeiro elemento de
+    // um ReadOnlySpan<INPUT> (INPUT é blittable, então o runtime só fixa o
+    // ponteiro, sem cópia).
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint nInputs, ref INPUT pInputs, int cbSize);
+
     public static readonly int InputSize = Marshal.SizeOf(typeof(INPUT));
 
     // ---------------------------------------------------------------
@@ -284,14 +290,17 @@ internal static class Win32
     /// e atômico do ponto de vista da fila de entrada do que várias chamadas
     /// separadas para cada tecla).
     /// </summary>
-    public static void SendInputs(IReadOnlyList<INPUT> inputs)
+    public static void SendInputs(IReadOnlyList<INPUT> inputs) => SendInputs(Win32InputInjector.Instance, inputs);
+
+    /// <inheritdoc cref="SendInputs(IReadOnlyList{INPUT})"/>
+    public static void SendInputs(IInputInjector injector, IReadOnlyList<INPUT> inputs)
     {
         if (inputs.Count == 0) return;
         var array = inputs as INPUT[] ?? new List<INPUT>(inputs).ToArray();
-        uint sent = SendInput((uint)array.Length, array, InputSize);
+        uint sent = injector.Send(array);
         if (sent != array.Length)
         {
-            int error = Marshal.GetLastWin32Error();
+            int error = injector.LastError;
             throw new InvalidOperationException(
                 $"SendInput enviou apenas {sent}/{array.Length} eventos. Código de erro Win32: {error}.");
         }
@@ -302,7 +311,10 @@ internal static class Win32
     /// aplicativo eventualmente usa, para garantir que nenhuma fique
     /// "logicamente pressionada" em caso de cancelamento ou exceção.
     /// </summary>
-    public static void ReleaseAllModifiers()
+    public static void ReleaseAllModifiers() => ReleaseAllModifiers(Win32InputInjector.Instance);
+
+    /// <inheritdoc cref="ReleaseAllModifiers()"/>
+    public static void ReleaseAllModifiers(IInputInjector injector)
     {
         var ups = new List<INPUT>
         {
@@ -315,7 +327,7 @@ internal static class Win32
         };
         try
         {
-            SendInputs(ups);
+            SendInputs(injector, ups);
         }
         catch
         {

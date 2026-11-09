@@ -39,9 +39,14 @@ public partial class App : System.Windows.Application
         _settingsService = new SettingsService();
         _historyService = new HistoryService();
         _queuePersistenceService = new QueuePersistenceService();
-        _queueService = new TypingQueueService(_logService, Dispatcher.CurrentDispatcher, _queuePersistenceService);
-        _mappingService = new KeyboardMappingService();
-        _typingService = new KeyboardInputService(_mappingService, _logService);
+        _queueService = new TypingQueueService(
+            _logService,
+            _queuePersistenceService,
+            new DispatcherAutoSaveScheduler(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(1.5)));
+        _mappingService = new KeyboardMappingService(Native.Win32KeyboardLayoutProvider.Instance);
+        _typingService = new KeyboardInputService(
+            _mappingService, _logService,
+            Native.Win32InputInjector.Instance, Native.Win32KeyboardLayoutProvider.Instance);
         _activeWindowService = new ActiveWindowService();
         _hotkeyService = new GlobalHotkeyService();
         _trayIconService = new TrayIconService();

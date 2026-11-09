@@ -24,12 +24,16 @@ public sealed class SettingsService
     };
 
     public SettingsService()
-    {
-        var dir = Path.Combine(
+        : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VmTyper");
-        Directory.CreateDirectory(dir);
-        _filePath = Path.Combine(dir, "settings.json");
+            "VmTyper", "settings.json"))
+    {
+    }
+
+    internal SettingsService(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        _filePath = filePath;
     }
 
     public AppSettings Load()

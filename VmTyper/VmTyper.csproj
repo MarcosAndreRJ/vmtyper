@@ -20,4 +20,9 @@
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="VmTyper.Tests" />
+    <InternalsVisibleTo Include="VmTyper.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

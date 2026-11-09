@@ -9,7 +9,7 @@ namespace VmTyper.Services;
 /// %AppData%\VmTyper\queue.json, para que o usuário não perca os textos
 /// preparados caso o aplicativo seja fechado acidentalmente.
 /// </summary>
-public sealed class QueuePersistenceService
+public sealed class QueuePersistenceService : IQueueStore
 {
     private readonly string _filePath;
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -18,12 +18,16 @@ public sealed class QueuePersistenceService
     };
 
     public QueuePersistenceService()
-    {
-        var dir = Path.Combine(
+        : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VmTyper");
-        Directory.CreateDirectory(dir);
-        _filePath = Path.Combine(dir, "queue.json");
+            "VmTyper", "queue.json"))
+    {
+    }
+
+    internal QueuePersistenceService(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        _filePath = filePath;
     }
 
     public List<TextBlockItem> Load()

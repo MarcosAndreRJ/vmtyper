@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Windows.Threading;
 using VmTyper.Models;
 
 namespace VmTyper.Services;
@@ -24,33 +23,27 @@ namespace VmTyper.Services;
 /// </summary>
 public sealed class TypingQueueService
 {
-    private readonly QueuePersistenceService _persistence;
+    private readonly IQueueStore _persistence;
     private readonly LogService _log;
-    private readonly DispatcherTimer _autoSaveTimer;
+    private readonly IAutoSaveScheduler _autoSaveTimer;
 
     public ObservableCollection<TextBlockItem> Blocks { get; } = new();
 
     /// <summary>Disparado após qualquer mutação relevante da fila (para a UI atualizar rótulos/resumos).</summary>
     public event Action? Changed;
 
-    public TypingQueueService(LogService log, Dispatcher dispatcher, QueuePersistenceService persistence)
+    /// <param name="autoSave">
+    /// Autosave "debounced": edições de texto reiniciam o timer, e só
+    /// gravamos em disco depois da última digitação (1.5s no app) — evita
+    /// I/O a cada tecla pressionada, mas garante que o conteúdo preparado
+    /// não se perca se o aplicativo for fechado inesperadamente.
+    /// </param>
+    public TypingQueueService(LogService log, IQueueStore persistence, IAutoSaveScheduler autoSave)
     {
         _log = log;
         _persistence = persistence;
-
-        // Autosave "debounced": edições de texto reiniciam o timer, e só
-        // gravamos em disco 1.5s depois da última digitação — evita I/O a
-        // cada tecla pressionada, mas garante que o conteúdo preparado não
-        // se perca se o aplicativo for fechado inesperadamente.
-        _autoSaveTimer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
-        {
-            Interval = TimeSpan.FromSeconds(1.5)
-        };
-        _autoSaveTimer.Tick += (_, _) =>
-        {
-            _autoSaveTimer.Stop();
-            Save();
-        };
+        _autoSaveTimer = autoSave;
+        _autoSaveTimer.Elapsed += Save;
 
         Blocks.CollectionChanged += OnBlocksCollectionChanged;
         LoadInternal();
@@ -71,8 +64,7 @@ public sealed class TypingQueueService
     {
         if (e.PropertyName == nameof(TextBlockItem.Text))
         {
-            _autoSaveTimer.Stop();
-            _autoSaveTimer.Start();
+            _autoSaveTimer.Restart();
         }
     }
 

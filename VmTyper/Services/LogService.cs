@@ -19,11 +19,16 @@ public sealed class LogService
     public ObservableCollection<string> Lines { get; } = new();
 
     public LogService(Dispatcher dispatcher)
+        : this(dispatcher, Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VmTyper", "logs"))
+    {
+    }
+
+    internal LogService(Dispatcher dispatcher, string logDirectory)
     {
         _dispatcher = dispatcher;
-        _logDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VmTyper", "logs");
+        _logDirectory = logDirectory;
         Directory.CreateDirectory(_logDirectory);
     }
 

@@ -68,13 +68,14 @@ public sealed class KeyboardMappingService
         ['̈'] = '¨',  // trema / diérese
     };
 
-    public IntPtr GetForegroundLayout()
+    private readonly IKeyboardLayoutProvider _layoutProvider;
+
+    internal KeyboardMappingService(IKeyboardLayoutProvider layoutProvider)
     {
-        IntPtr hwnd = Win32.GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return IntPtr.Zero;
-        uint threadId = Win32.GetWindowThreadProcessId(hwnd, out _);
-        return Win32.GetKeyboardLayout(threadId);
+        _layoutProvider = layoutProvider;
     }
+
+    public IntPtr GetForegroundLayout() => _layoutProvider.GetLayout();
 
     public MappingResult Resolve(char c, IntPtr layout)
     {
@@ -125,9 +126,9 @@ public sealed class KeyboardMappingService
             $"Caractere '{c}' (U+{(int)c:X4}) não é suportado pelo layout de teclado ativo.");
     }
 
-    private static KeyCombo? TryResolveSingle(char c, IntPtr layout)
+    private KeyCombo? TryResolveSingle(char c, IntPtr layout)
     {
-        short scan = Win32.VkKeyScanEx(c, layout);
+        short scan = _layoutProvider.VkKeyScan(c, layout);
         if (scan == -1) return null;
 
         byte vk = (byte)(scan & 0xFF);

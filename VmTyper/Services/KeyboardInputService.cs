@@ -71,11 +71,19 @@ public sealed class KeyboardInputService : IKeyboardInputService
 
     private readonly KeyboardMappingService _mapping;
     private readonly LogService _log;
+    private readonly IInputInjector _injector;
+    private readonly IKeyboardLayoutProvider _layoutProvider;
 
-    public KeyboardInputService(KeyboardMappingService mapping, LogService log)
+    internal KeyboardInputService(
+        KeyboardMappingService mapping,
+        LogService log,
+        IInputInjector injector,
+        IKeyboardLayoutProvider layoutProvider)
     {
         _mapping = mapping;
         _log = log;
+        _injector = injector;
+        _layoutProvider = layoutProvider;
     }
 
     public async Task TypeTextAsync(
@@ -177,7 +185,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
             // Rede de segurança final: mesmo que cada unidade de envio já
             // balanceie seus próprios modificadores, garantimos aqui que
             // nada fique preso, cobrindo também exceções inesperadas.
-            Win32.ReleaseAllModifiers();
+            Win32.ReleaseAllModifiers(_injector);
         }
     }
 
@@ -249,28 +257,28 @@ public sealed class KeyboardInputService : IKeyboardInputService
         _ => c.ToString()
     };
 
-    private static (ushort scan, bool extended) ResolveScan(ushort vk, IntPtr layout)
+    private (ushort scan, bool extended) ResolveScan(ushort vk, IntPtr layout)
     {
-        ushort scan = (ushort)Win32.MapVirtualKeyEx(vk, Win32.MAPVK_VK_TO_VSC, layout);
+        ushort scan = (ushort)_layoutProvider.MapVirtualKey(vk, Win32.MAPVK_VK_TO_VSC, layout);
         return (scan, Win32.IsExtendedKey(vk));
     }
 
     /// <summary>Envia KeyDown, aguarda uma folga real não-cancelável, depois envia KeyUp — em duas chamadas SendInput separadas.</summary>
-    private static void SendScanKey(ushort scan, bool extended)
+    private void SendScanKey(ushort scan, bool extended)
     {
-        Win32.SendInputs(new[] { Win32.ScanKeyDown(scan, extended) });
+        Win32.SendInputs(_injector, new[] { Win32.ScanKeyDown(scan, extended) });
         PreciseDelay(KeyPressDurationMs);
-        Win32.SendInputs(new[] { Win32.ScanKeyUp(scan, extended) });
+        Win32.SendInputs(_injector, new[] { Win32.ScanKeyUp(scan, extended) });
     }
 
-    private static void SendSpecialKey(ushort vk, IntPtr layout)
+    private void SendSpecialKey(ushort vk, IntPtr layout)
     {
         var (scan, extended) = ResolveScan(vk, layout);
         SendScanKey(scan, extended);
     }
 
     /// <summary>Envia uma tecla com Shift opcional (usada pelas rotinas de reset de indentação).</summary>
-    private static void SendModifiedKey(ushort vk, bool shift, IntPtr layout)
+    private void SendModifiedKey(ushort vk, bool shift, IntPtr layout)
     {
         var downs = new List<Win32.INPUT>();
         var ups = new List<Win32.INPUT>();
@@ -286,12 +294,12 @@ public sealed class KeyboardInputService : IKeyboardInputService
         downs.Add(Win32.ScanKeyDown(ms, me));
         ups.Insert(0, Win32.ScanKeyUp(ms, me));
 
-        Win32.SendInputs(downs);
+        Win32.SendInputs(_injector, downs);
         PreciseDelay(KeyPressDurationMs);
-        Win32.SendInputs(ups);
+        Win32.SendInputs(_injector, ups);
     }
 
-    private static void SendKeyCombo(KeyCombo combo, IntPtr layout)
+    private void SendKeyCombo(KeyCombo combo, IntPtr layout)
     {
         var downs = new List<Win32.INPUT>();
         var ups = new List<Win32.INPUT>();
@@ -337,16 +345,16 @@ public sealed class KeyboardInputService : IKeyboardInputService
         // da tecla principal), aguardam uma folga real, depois sobem juntas
         // na ordem inversa (tecla principal primeiro, modificadores por
         // último) — duas chamadas SendInput, nunca uma só com down+up.
-        Win32.SendInputs(downs);
+        Win32.SendInputs(_injector, downs);
         PreciseDelay(KeyPressDurationMs);
-        Win32.SendInputs(ups);
+        Win32.SendInputs(_injector, ups);
     }
 
-    private static void SendUnicodeChar(char c)
+    private void SendUnicodeChar(char c)
     {
-        Win32.SendInputs(new[] { Win32.UnicodeKeyDown(c) });
+        Win32.SendInputs(_injector, new[] { Win32.UnicodeKeyDown(c) });
         PreciseDelay(KeyPressDurationMs);
-        Win32.SendInputs(new[] { Win32.UnicodeKeyUp(c) });
+        Win32.SendInputs(_injector, new[] { Win32.UnicodeKeyUp(c) });
     }
 
     /// <summary>
@@ -376,7 +384,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
     /// quebra de linha), a seleção é naturalmente substituída pelo próximo
     /// caractere ou Enter enviado.
     /// </summary>
-    private static void ResetLineIndentation(IndentationResetStrategy strategy, IntPtr layout)
+    private void ResetLineIndentation(IndentationResetStrategy strategy, IntPtr layout)
     {
         var effective = strategy == IndentationResetStrategy.Auto
             ? IndentationResetStrategy.ShiftHomeDelete
