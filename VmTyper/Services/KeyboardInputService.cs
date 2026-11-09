@@ -145,7 +145,11 @@ public sealed class KeyboardInputService : IKeyboardInputService
 
             if (options.DiagnosticMode)
             {
-                _log.Info($"[Diagnóstico] Index={charIndex} Unicode=U+{(int)c:X4} Char='{Display(c)}' Método={outcome} KeyDown=1 KeyUp=1");
+                _log.Info($"[Diagnóstico] Index={charIndex} Categoria={LogService.Categorize(c)} Método={outcome} KeyDown=1 KeyUp=1");
+                if (_log.DetailedTrace)
+                {
+                    _log.TraceSensitive($"[Diagnóstico] Index={charIndex} Unicode=U+{(int)c:X4} Char='{Display(c)}' Método={outcome}");
+                }
             }
             charIndex++;
 
@@ -263,12 +267,12 @@ public sealed class KeyboardInputService : IKeyboardInputService
 
         if (method == InputMethod.Automatico)
         {
-            _log.Warn($"Método automático: fallback para Unicode no caractere U+{(int)c:X4} ('{Display(c)}').");
+            _log.Warn($"Método automático: fallback para Unicode na unidade (Categoria={LogService.Categorize(c)}).");
             SendUnicodeChar(c);
             return "Unicode(fallback)";
         }
 
-        _log.Warn($"Caractere não suportado pelo layout ativo e ignorado: U+{(int)c:X4} ('{Display(c)}'). {mapping.FailureReason}");
+        _log.Warn($"Caractere não suportado pelo layout ativo e ignorado (Categoria={LogService.Categorize(c)}).");
         return "Ignorado";
     }
 
@@ -479,23 +483,29 @@ public sealed class KeyboardInputService : IKeyboardInputService
         string result = text;
         char nextSentinel = (char)0xE000; // Area de Uso Privado do Unicode
 
-        foreach (var sub in substitutions)
+        var appliedRules = new List<string>();
+        for (int i = 0; i < substitutions.Count; i++)
         {
+            var sub = substitutions[i];
             if (string.IsNullOrEmpty(sub.From)) continue;
             if (!result.Contains(sub.From, StringComparison.Ordinal)) continue;
 
+            appliedRules.Add($"#{i + 1}");
             if (sub.Mode == SubstitutionMode.Combinacao)
             {
                 char sentinel = nextSentinel++;
                 comboMap[sentinel] = sub;
                 result = result.Replace(sub.From, sentinel.ToString());
-                log.Info($"Substituição (combinação de teclas) aplicada: '{sub.From}' → {sub.ComboLabel}.");
             }
             else
             {
                 result = result.Replace(sub.From, sub.To);
-                log.Info($"Substituição aplicada: '{sub.From}' → '{sub.To}'.");
             }
+        }
+
+        if (appliedRules.Count > 0)
+        {
+            log.Info($"{appliedRules.Count} substituições aplicadas (regras {string.Join(", ", appliedRules)}).");
         }
 
         return (result, comboMap);

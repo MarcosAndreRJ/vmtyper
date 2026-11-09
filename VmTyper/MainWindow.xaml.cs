@@ -25,6 +25,15 @@ public partial class MainWindow : Window
 
         viewModel.ConfirmPartialResume = ConfirmPartialResumeDialog;
 
+        if (App.QueueLoadCorruptPath is { } corruptPath)
+        {
+            MessageBox.Show(this,
+                $"A fila salva não pôde ser lida.\nUma cópia foi preservada em:\n{corruptPath}\n\nComeçar com fila vazia?",
+                "Fila corrompida preservada",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         App.TrayIconServiceInstance.OpenRequested += TrayOpen;
         App.TrayIconServiceInstance.TypeRequested += () => _viewModel?.StartCommand.Execute(null);
         App.TrayIconServiceInstance.PauseResumeRequested += () => _viewModel?.PauseResumeCommand.Execute(null);

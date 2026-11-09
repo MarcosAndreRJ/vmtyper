@@ -1,4 +1,5 @@
 using VmTyper.Models;
+using VmTyper.Services.Persistence;
 
 namespace VmTyper.Services;
 
@@ -10,6 +11,14 @@ namespace VmTyper.Services;
 public interface IQueueStore
 {
     List<TextBlockItem> Load();
+
+    LoadResult<List<TextBlockItem>>? LastLoadResult => null;
+
+    event Action<string>? PersistenceFailed
+    {
+        add { }
+        remove { }
+    }
 
     void Save(IEnumerable<TextBlockItem> blocks);
 }

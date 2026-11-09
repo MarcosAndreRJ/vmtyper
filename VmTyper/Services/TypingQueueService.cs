@@ -54,6 +54,15 @@ public sealed class TypingQueueService
     /// <summary>Disparado quando um bloco já enviado (Sent) é editado e devolvido para Ready.</summary>
     public event Action<TextBlockItem>? SentBlockEdited;
 
+    /// <summary>Disparado quando uma gravação em disco falha (§4.1).</summary>
+    public event Action<string>? PersistenceFailed
+    {
+        add => _persistence.PersistenceFailed += value;
+        remove => _persistence.PersistenceFailed -= value;
+    }
+
+    public Persistence.LoadResult<List<TextBlockItem>>? LastLoadResult => _persistence.LastLoadResult;
+
     public TypingQueueService(LogService log, IQueueStore persistence, IAutoSaveScheduler autoSave)
     {
         _log = log;

@@ -30,6 +30,9 @@ public partial class App : System.Windows.Application
     public static TypingSessionCoordinator CoordinatorInstance => ((App)Current)._coordinator!;
     public static IKeyboardInputService TypingServiceInstance => ((App)Current)._typingService!;
     public static TrayIconService TrayIconServiceInstance => ((App)Current)._trayIconService!;
+    public static string? QueueLoadCorruptPath => ((App)Current)._queuePersistenceService?.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } r
+        ? r.PreservedCorruptPath
+        : null;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,8 +42,11 @@ public partial class App : System.Windows.Application
 
         _logService = new LogService(Dispatcher.CurrentDispatcher);
         _settingsService = new SettingsService();
+        var initialSettings = _settingsService.Load();
+        _logService.DetailedTrace = false;
         _historyService = new HistoryService();
-        _queuePersistenceService = new QueuePersistenceService();
+        _queuePersistenceService = new QueuePersistenceService(() =>
+            (_mainViewModel?.Settings ?? initialSettings).QueueTextPersistence);
         _queueService = new TypingQueueService(
             _logService,
             _queuePersistenceService,
@@ -95,6 +101,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_logService is not null) _logService.DetailedTrace = false;
         _mainViewModel?.Shutdown();
         _hotkeyService?.Dispose();
         _trayIconService?.Dispose();

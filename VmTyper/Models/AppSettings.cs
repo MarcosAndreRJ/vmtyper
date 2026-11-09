@@ -9,6 +9,33 @@ public enum ExpectedBrowser
 }
 
 /// <summary>
+/// Política de persistência do texto dos blocos em queue.json (§4.2).
+/// </summary>
+public enum QueueTextPersistence
+{
+    Full,
+    Encrypted,
+    None
+}
+
+/// <summary>
+/// Feature flags experimentais e de diagnóstico (princípio transversal §2.2).
+/// </summary>
+public sealed class FeatureFlags
+{
+    public bool AdaptiveTiming { get; set; }
+    public bool TargetGuardStrict { get; set; }
+    public bool EmbeddedBrowser { get; set; }
+    public bool CdpInput { get; set; }
+
+    /// <summary>
+    /// Libera a gravação do caractere em logs de diagnóstico (desligada automaticamente ao fechar o app).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool DetailedTrace { get; set; }
+}
+
+/// <summary>
 /// Representa um atalho global configurável (modificadores + tecla).
 /// </summary>
 public sealed class HotkeyDefinition
@@ -74,6 +101,12 @@ public sealed class AppSettings
     // --- Segurança ---
     public bool ValidateTargetWindow { get; set; }
     public ExpectedBrowser ExpectedBrowser { get; set; } = ExpectedBrowser.Chrome;
+    public bool EnableTargetGuard { get; set; } = true;
+    public string TargetLayout { get; set; } = "HostForeground";
+
+    // --- Privacidade e recursos ---
+    public QueueTextPersistence QueueTextPersistence { get; set; } = QueueTextPersistence.Full;
+    public FeatureFlags Features { get; set; } = new();
 
     // --- Comportamento ---
     public bool MinimizeToTray { get; set; } = true;

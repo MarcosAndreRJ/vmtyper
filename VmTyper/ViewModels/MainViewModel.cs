@@ -204,6 +204,42 @@ public sealed class MainViewModel : ObservableObject
         LogLines = log.Lines;
         Settings = _settingsService.Load();
 
+        _queueService.PersistenceFailed += err =>
+        {
+            StatusMessage = "As alterações não estão sendo salvas";
+            _log.Error("Falha ao persistir fila: " + err);
+        };
+        _settingsService.PersistenceFailed += err =>
+        {
+            StatusMessage = "As alterações não estão sendo salvas";
+            _log.Error("Falha ao persistir configurações: " + err);
+        };
+        _historyService.PersistenceFailed += err =>
+        {
+            StatusMessage = "As alterações não estão sendo salvas";
+            _log.Error("Falha ao persistir histórico: " + err);
+        };
+
+        if (_queueService.LastLoadResult is { Status: Services.Persistence.LoadStatus.RestoredFromBackup })
+        {
+            StatusMessage = "Aviso: fila restaurada do backup (.bak).";
+            _log.Warn(StatusMessage);
+        }
+        else if (_queueService.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } corruptQueue)
+        {
+            StatusMessage = $"A fila salva não pôde ser lida. Cópia preservada em: {corruptQueue.PreservedCorruptPath}";
+            _log.Warn(StatusMessage);
+        }
+
+        if (_settingsService.LastLoadResult is { Status: Services.Persistence.LoadStatus.RestoredFromBackup })
+        {
+            _log.Warn("Configurações restauradas do backup (.bak).");
+        }
+        else if (_settingsService.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } corruptSettings)
+        {
+            _log.Warn($"Configurações corrompidas preservadas em: {corruptSettings.PreservedCorruptPath}");
+        }
+
         foreach (var session in _historyService.Load())
         {
             History.Add(session);
