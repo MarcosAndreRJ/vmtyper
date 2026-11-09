@@ -23,6 +23,8 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         ApplyBehaviorSettings();
 
+        viewModel.ConfirmPartialResume = ConfirmPartialResumeDialog;
+
         App.TrayIconServiceInstance.OpenRequested += TrayOpen;
         App.TrayIconServiceInstance.TypeRequested += () => _viewModel?.StartCommand.Execute(null);
         App.TrayIconServiceInstance.PauseResumeRequested += () => _viewModel?.PauseResumeCommand.Execute(null);
@@ -76,8 +78,42 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool? ConfirmPartialResumeDialog(TextBlockItem block)
+    {
+        if (block.SentUpToIndex > 0 && block.SentUpToIndex < block.Text.Length)
+        {
+            string remaining = block.Text.Substring(block.SentUpToIndex);
+            string preview = remaining.Length > 40 ? remaining.Substring(0, 40) + "…" : remaining;
+            var res = MessageBox.Show(this,
+                $"O Bloco {block.Order} está no estado '{block.StatusLabel}'.\n\n" +
+                $"• Sim: Reenviar do início (recomendado)\n" +
+                $"• Não: Continuar da unidade {block.SentUpToIndex} (texto restante: \"{preview}\")\n" +
+                $"• Cancelar: Não iniciar agora",
+                "Confirmar envio de bloco interrompido/parcial",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question,
+                MessageBoxResult.Yes);
+
+            return res switch
+            {
+                MessageBoxResult.Yes => false,
+                MessageBoxResult.No => true,
+                _ => null
+            };
+        }
+
+        var simple = MessageBox.Show(this,
+            $"O Bloco {block.Order} está no estado '{block.StatusLabel}'. Deseja reenviar do início?",
+            "Confirmar reenvio",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.OK);
+        return simple == MessageBoxResult.OK ? false : null;
+    }
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
+        if (_viewModel is { CanEditQueue: false }) return;
         var window = new SettingsWindow(App.SettingsServiceInstance)
         {
             Owner = this
@@ -91,6 +127,7 @@ public partial class MainWindow : Window
 
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
     {
+        if (_viewModel is { CanEditQueue: false }) return;
         var window = new DiagnosticsWindow(App.TypingServiceInstance, App.LogServiceInstance, App.CoordinatorInstance)
         {
             Owner = this

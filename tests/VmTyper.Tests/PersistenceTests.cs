@@ -20,15 +20,15 @@ public sealed class PersistenceTests : IDisposable
         var store = new QueuePersistenceService(path);
         var blocks = new List<TextBlockItem>
         {
-            new() { Order = 1, Text = "um", Status = TextBlockStatus.Completed },
-            new() { Order = 2, Text = "dois", Status = TextBlockStatus.Current },
+            new() { Order = 1, Text = "um", Status = TextBlockStatus.Sent },
+            new() { Order = 2, Text = "dois", Status = TextBlockStatus.Ready },
         };
 
         store.Save(blocks);
         var loaded = new QueuePersistenceService(path).Load();
 
         Assert.Equal(new[] { "um", "dois" }, loaded.Select(b => b.Text));
-        Assert.Equal(new[] { TextBlockStatus.Completed, TextBlockStatus.Current }, loaded.Select(b => b.Status));
+        Assert.Equal(new[] { TextBlockStatus.Sent, TextBlockStatus.Ready }, loaded.Select(b => b.Status));
         Assert.Equal(blocks.Select(b => b.Id), loaded.Select(b => b.Id));
     }
 

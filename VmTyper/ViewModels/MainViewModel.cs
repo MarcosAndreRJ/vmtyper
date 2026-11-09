@@ -33,8 +33,15 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<int, CancellationToken, Task> _delayAsync;
 
     private TypingSessionLease? _activeLease;
+    private Guid? _activeBlockId;
     private DateTime _sessionStartedAt;
     private TypingState _stateBeforePause = TypingState.Digitando;
+
+    /// <summary>
+    /// Callback de UI para blocos em PartiallySent / Interrupted / Failed (§1.2 nota ⁴).
+    /// Recebe o bloco e retorna: null = cancelar; false = reenviar do início (padrão); true = continuar de SentUpToIndex.
+    /// </summary>
+    public Func<TextBlockItem, bool?>? ConfirmPartialResume { get; set; }
 
     public AppSettings Settings { get; private set; }
 
@@ -86,8 +93,8 @@ public sealed class MainViewModel : ObservableObject
         {
             var current = _queueService.Current;
             if (current is not null) return $"Próximo: Bloco {current.Order} de {_queueService.TotalBlocks}";
-            return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Completed)
-                ? "Todos os blocos foram concluídos."
+            return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent)
+                ? "Todos os blocos foram enviados."
                 : "Fila vazia — adicione conteúdo a um bloco.";
         }
     }
@@ -98,15 +105,15 @@ public sealed class MainViewModel : ObservableObject
         {
             var current = _queueService.Current;
             if (current is not null) return $"DIGITAR BLOCO {current.Order}";
-            return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Completed) ? "FILA CONCLUÍDA" : "DIGITAR";
+            return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent) ? "FILA ENVIADA" : "DIGITAR";
         }
     }
 
     public string QueueSummary =>
-        $"Blocos: {_queueService.TotalBlocks}   |   Concluídos: {_queueService.CompletedCount}   |   Pendentes: {_queueService.PendingCount}";
+        $"Blocos: {_queueService.TotalBlocks}   |   Enviados: {_queueService.CompletedCount}   |   Pendentes: {_queueService.PendingCount}";
 
     public string QueueProgressLabel =>
-        $"Fila: {_queueService.CompletedCount} de {_queueService.TotalBlocks} blocos concluídos";
+        $"Fila: {_queueService.CompletedCount} de {_queueService.TotalBlocks} blocos enviados";
 
     private string _statusMessage = "Pronto para digitar.";
     public string StatusMessage
@@ -203,15 +210,20 @@ public sealed class MainViewModel : ObservableObject
         }
 
         _queueService.Changed += OnQueueChanged;
+        _queueService.SentBlockEdited += block =>
+        {
+            StatusMessage = $"Aviso: o Bloco {block.Order} já havia sido enviado e voltou para 'Pronto' após a edição.";
+            _log.Info(StatusMessage);
+        };
 
         StartCommand = new RelayCommand(async () => await StartAsync(), () => !IsBusy && HasNextBlock);
         PauseResumeCommand = new RelayCommand(TogglePause, () => CanPause);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
         ClearHistoryCommand = new RelayCommand(() => { History.Clear(); _historyService.Save(History); });
 
-        MoveUpCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveUp(b.Id); }, p => !IsBusy);
-        MoveDownCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveDown(b.Id); }, p => !IsBusy);
-        SetAsNextCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.SetAsNext(b.Id); }, p => !IsBusy);
+        MoveUpCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveUp(b.Id); }, p => CanEditQueue);
+        MoveDownCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveDown(b.Id); }, p => CanEditQueue);
+        SetAsNextCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.SetAsNext(b.Id); }, p => CanEditQueue);
 
         RegisterPermanentHotkeys();
     }
@@ -293,26 +305,59 @@ public sealed class MainViewModel : ObservableObject
         var next = _queueService.PeekNext();
         if (next is null)
         {
-            StatusMessage = _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Completed)
-                ? "Todos os blocos foram concluídos."
+            StatusMessage = _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent)
+                ? "Todos os blocos foram enviados."
                 : "Não há blocos com conteúdo para digitar.";
             return;
         }
 
+        int resumeFromIndex = 0;
+        if (next.Status is TextBlockStatus.PartiallySent or TextBlockStatus.Interrupted or TextBlockStatus.Failed)
+        {
+            if (ConfirmPartialResume is not null)
+            {
+                bool? resumeChoice = ConfirmPartialResume(next);
+                if (resumeChoice is null)
+                {
+                    StatusMessage = $"Envio do Bloco {next.Order} cancelado na confirmação.";
+                    return;
+                }
+                if (resumeChoice == true && next.SentUpToIndex > 0 && next.SentUpToIndex < next.Text.Length)
+                {
+                    resumeFromIndex = next.SentUpToIndex;
+                }
+                else
+                {
+                    next.SentUpToIndex = 0;
+                }
+            }
+            else
+            {
+                // Padrão (§1.2 nota ⁴): do início, nunca continuar automaticamente.
+                next.SentUpToIndex = 0;
+            }
+        }
+
         Guid blockId = next.Id;
         int blockOrder = next.Order;
+        Guid sessionId = lease.SessionId;
         var token = lease.Token;
+
+        string textToType = resumeFromIndex > 0 && resumeFromIndex < next.Text.Length
+            ? next.Text.Substring(resumeFromIndex)
+            : next.Text;
 
         State = TypingState.AguardandoContagem;
         _sessionStartedAt = DateTime.Now;
-        TotalCharacters = next.Text.Length;
+        TotalCharacters = textToType.Length;
         TypedCharacters = 0;
 
         _log.Info("Sessão iniciada");
-        _log.Info($"Bloco: {blockOrder}");
+        _log.Info($"Bloco: {blockOrder} (Id={blockId})");
         _log.Info($"Método: {Settings.Method}");
-        _log.Info($"Caracteres: {next.Text.Length}");
+        _log.Info($"Caracteres: {textToType.Length}");
 
+        bool typingStarted = false;
         try
         {
             int seconds = Math.Max(0, Settings.CountdownSeconds);
@@ -349,7 +394,9 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            _queueService.BeginTyping(blockId);
+            _queueService.BeginTyping(blockId, sessionId);
+            _activeBlockId = blockId;
+            typingStarted = true;
             State = TypingState.Digitando;
             StatusMessage = $"Digitando Bloco {blockOrder}...";
 
@@ -366,20 +413,20 @@ public sealed class MainViewModel : ObservableObject
             var progress = new Progress<TypingProgress>(OnProgress);
 
             _log.Info("Digitação iniciada");
-            await _typingService.TypeTextAsync(block.Text, options, progress, lease.Pause, token)
+            await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token)
                 .ConfigureAwait(true);
 
             double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
             State = TypingState.Concluido;
             _log.Info($"Digitação concluída. Caracteres enviados: {TypedCharacters}. Duração: {duration:0.0}s");
 
-            AddHistoryEntry(blockOrder, TotalCharacters, completed: true, duration);
-            _queueService.CompleteBlock(blockId, Settings.ClearTextAfterCompletion);
+            AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: true, duration);
+            _queueService.CompleteBlock(blockId, Settings.ClearTextAfterCompletion, resumeFromIndex + TypedCharacters, sessionId);
 
             var upcoming = _queueService.Current;
             StatusMessage = upcoming is not null
-                ? $"Bloco {blockOrder} concluído. Próximo: Bloco {upcoming.Order}."
-                : "Todos os blocos foram concluídos.";
+                ? $"Bloco {blockOrder} enviado. Próximo: Bloco {upcoming.Order}."
+                : "Todos os blocos foram enviados.";
         }
         catch (OperationCanceledException)
         {
@@ -387,25 +434,34 @@ public sealed class MainViewModel : ObservableObject
             State = TypingState.Cancelado;
             StatusMessage = $"Digitação do Bloco {blockOrder} cancelada pelo usuário.";
             _log.Info("Digitação cancelada pelo usuário.");
-            AddHistoryEntry(blockOrder, TotalCharacters, completed: false, duration);
-            // O bloco NÃO avança: volta a ser o próximo (Current) da fila.
-            _queueService.CancelBlock(blockId);
+            AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: false, duration);
+            if (typingStarted)
+            {
+                _queueService.CancelBlock(blockId, resumeFromIndex + TypedCharacters, sessionId);
+            }
         }
         catch (Exception ex)
         {
             State = TypingState.Erro;
             StatusMessage = $"Erro no Bloco {blockOrder}: {ex.Message}";
             _log.Error(ex.Message);
-            // Mesmo em erro inesperado, o bloco não pode ficar preso em
-            // "Digitando" para sempre nem ser considerado concluído.
-            _queueService.CancelBlock(blockId);
+            if (typingStarted)
+            {
+                _queueService.FailBlock(blockId, ex.Message, resumeFromIndex + TypedCharacters, sessionId);
+            }
+        }
+        finally
+        {
+            _activeBlockId = null;
         }
     }
 
-    private void AddHistoryEntry(int blockOrder, int characterCount, bool completed, double durationSeconds)
+    private void AddHistoryEntry(Guid sessionId, Guid blockId, int blockOrder, int characterCount, bool completed, double durationSeconds)
     {
         var entry = new TypingSession
         {
+            SessionId = sessionId,
+            BlockId = blockId,
             StartedAt = _sessionStartedAt,
             BlockOrder = blockOrder,
             CharacterCount = characterCount,
@@ -435,6 +491,10 @@ public sealed class MainViewModel : ObservableObject
         {
             _stateBeforePause = State;
             lease.PauseSession();
+            if (_stateBeforePause == TypingState.Digitando && _activeBlockId.HasValue)
+            {
+                _queueService.PauseOrResumeBlock(_activeBlockId.Value);
+            }
             State = TypingState.Pausado;
             StatusMessage = _stateBeforePause == TypingState.AguardandoContagem
                 ? "Contagem pausada. Clique em CONTINUAR para retomar."
@@ -445,6 +505,10 @@ public sealed class MainViewModel : ObservableObject
         }
         else if (State == TypingState.Pausado)
         {
+            if (_stateBeforePause == TypingState.Digitando && _activeBlockId.HasValue)
+            {
+                _queueService.PauseOrResumeBlock(_activeBlockId.Value);
+            }
             lease.ResumeSession();
             State = _stateBeforePause;
             StatusMessage = _stateBeforePause == TypingState.AguardandoContagem

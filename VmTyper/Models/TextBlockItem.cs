@@ -41,7 +41,7 @@ public sealed class TextBlockItem : ObservableObject
         }
     }
 
-    private TextBlockStatus _status = TextBlockStatus.Pending;
+    private TextBlockStatus _status = TextBlockStatus.Empty;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public TextBlockStatus Status
@@ -50,9 +50,70 @@ public sealed class TextBlockItem : ObservableObject
         set
         {
             if (SetField(ref _status, value))
+            {
+                OnPropertyChanged(nameof(StatusLabel));
+                OnPropertyChanged(nameof(IsTypingOrPaused));
+            }
+        }
+    }
+
+    private bool _isNext;
+
+    /// <summary>Calculado e notificado por <see cref="Services.TypingQueueService"/>.</summary>
+    [JsonIgnore]
+    public bool IsNext
+    {
+        get => _isNext;
+        internal set
+        {
+            if (SetField(ref _isNext, value))
                 OnPropertyChanged(nameof(StatusLabel));
         }
     }
+
+    private int _sentUpToIndex;
+    public int SentUpToIndex
+    {
+        get => _sentUpToIndex;
+        set
+        {
+            if (SetField(ref _sentUpToIndex, value))
+                OnPropertyChanged(nameof(StatusLabel));
+        }
+    }
+
+    private string? _lastError;
+    public string? LastError
+    {
+        get => _lastError;
+        set
+        {
+            if (SetField(ref _lastError, value))
+                OnPropertyChanged(nameof(StatusLabel));
+        }
+    }
+
+    private Guid? _lastSessionId;
+    public Guid? LastSessionId
+    {
+        get => _lastSessionId;
+        set => SetField(ref _lastSessionId, value);
+    }
+
+    private string? _persistenceNote;
+    [JsonIgnore]
+    public string? PersistenceNote
+    {
+        get => _persistenceNote;
+        set
+        {
+            if (SetField(ref _persistenceNote, value))
+                OnPropertyChanged(nameof(StatusLabel));
+        }
+    }
+
+    [JsonIgnore]
+    public bool IsTypingOrPaused => Status is TextBlockStatus.Typing or TextBlockStatus.Paused;
 
     [JsonIgnore]
     public string Header => $"BLOCO {Order}";
@@ -72,13 +133,30 @@ public sealed class TextBlockItem : ObservableObject
     public bool IsEmpty => string.IsNullOrWhiteSpace(Text);
 
     [JsonIgnore]
-    public string StatusLabel => (Status, IsEmpty) switch
+    public string StatusLabel
     {
-        (TextBlockStatus.Completed, _) => "✓ Concluído",
-        (TextBlockStatus.Typing, _) => "⌨ Digitando",
-        (TextBlockStatus.Current, _) => "▶ Próximo",
-        (TextBlockStatus.Pending, true) => "○ Vazio",
-        (TextBlockStatus.Pending, false) => "○ Pendente",
-        _ => Status.ToString()
-    };
+        get
+        {
+            string baseLabel = Status switch
+            {
+                TextBlockStatus.Sent => "✓ Enviado",
+                TextBlockStatus.Typing => "⌨ Digitando",
+                TextBlockStatus.Paused => "⏸ Pausado",
+                TextBlockStatus.PartiallySent => $"◐ Parcial ({SentUpToIndex})",
+                TextBlockStatus.Failed => "✗ Falhou",
+                TextBlockStatus.Interrupted => "⚠ Interrompido",
+                TextBlockStatus.Empty => string.IsNullOrEmpty(PersistenceNote) ? "○ Vazio" : $"○ Vazio ({PersistenceNote})",
+                TextBlockStatus.Ready when IsNext => "▶ Próximo",
+                TextBlockStatus.Ready => "○ Pronto",
+                _ => Status.ToString()
+            };
+
+            if (IsNext && Status is not TextBlockStatus.Ready and not TextBlockStatus.Typing and not TextBlockStatus.Paused)
+            {
+                return $"▶ Próximo · {baseLabel}";
+            }
+
+            return baseLabel;
+        }
+    }
 }
