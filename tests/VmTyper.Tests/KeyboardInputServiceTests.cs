@@ -390,4 +390,10 @@ public sealed class KeyboardInputServiceTests : IDisposable
         string decoded = h.Layout.Decode(h.Injector.Delivered);
         Assert.Equal(corpus, decoded);
     }
+
+    [Fact]
+    public void Win32InputStruct_Is40BytesOnX64()
+    {
+        Assert.Equal(40, System.Runtime.InteropServices.Marshal.SizeOf<Win32.INPUT>());
+    }
 }
