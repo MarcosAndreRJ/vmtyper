@@ -214,6 +214,51 @@ public sealed class BaselineFidelityTests
         Assert.Equal("abc", exp1.Text);
         Assert.Equal(string.Empty, exp2.Text);
     }
+
+    [IntegrationTheory]
+    [InlineData(ProfileKind.Legacy)]
+    [InlineData(ProfileKind.Fast)]
+    [InlineData(ProfileKind.Compatibility)]
+    [InlineData(ProfileKind.Natural)]
+    public async Task Corpus_AllProfiles_ReachReceiverIdentically(ProfileKind profileKind)
+    {
+        string corpus = KeyboardInputService.NormalizeLineEndings(
+            await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "corpora", "basico.txt"))).TrimEnd('\n');
+
+        using var receiver = ReceiverProcess.Start(hook: true);
+        receiver.Send("CLEAR");
+        receiver.Send("ACTIVATE");
+        await Task.Delay(500);
+
+        Assert.True(receiver.IsForeground(), $"O receptor não ficou em primeiro plano ({receiver.DescribeForeground()}); nenhuma tecla foi enviada.");
+
+        var profile = profileKind switch
+        {
+            ProfileKind.Fast => TypingProfile.Fast(seed: 42),
+            ProfileKind.Compatibility => TypingProfile.Compatibility(seed: 42),
+            ProfileKind.Natural => TypingProfile.Natural(seed: 42),
+            _ => TypingProfile.Legacy(5, 20, seed: 42)
+        };
+
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        var engine = new KeyboardInputService(
+            new KeyboardMappingService(Win32KeyboardLayoutProvider.Instance), log,
+            Win32InputInjector.Instance, Win32KeyboardLayoutProvider.Instance);
+        var options = new TypingOptions
+        {
+            Method = InputMethod.TecladoFisico,
+            TargetLayout = "HostForeground",
+            Profile = profile
+        };
+
+        await engine.TypeTextAsync(corpus, options, null, PauseToken.None, CancellationToken.None);
+        await Task.Delay(500);
+
+        var result = receiver.Export();
+        string received = KeyboardInputService.NormalizeLineEndings(result.Text);
+        Assert.Equal(corpus, received);
+    }
 }
 
 internal static class TextDiff

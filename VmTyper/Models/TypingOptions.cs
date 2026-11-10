@@ -71,4 +71,10 @@ public sealed class TypingOptions
 
     /// <summary>Callback síncrono opcional invocado imediatamente antes de enviar cada unidade (usado pelo TargetGuard §3.2).</summary>
     public Func<int, CancellationToken, Task>? BeforeUnitAsync { get; init; }
+
+    /// <summary>
+    /// Perfil de temporização opcional (Fase 2 §2). Quando nulo, usa
+    /// <c>TypingProfile.Legacy(CharDelayMs, EnterDelayMs)</c>.
+    /// </summary>
+    public TypingProfile? Profile { get; init; }
 }

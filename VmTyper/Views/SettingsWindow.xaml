@@ -48,6 +48,16 @@
                             <TextBox Grid.Row="2" Grid.Column="1" x:Name="CountdownBox"/>
                         </Grid>
 
+                        <CheckBox x:Name="AdaptiveTimingCheck" Content="Habilitar perfis de temporização adaptativa (AdaptiveTiming)" Margin="0,14,0,6" Checked="AdaptiveTimingCheck_Changed" Unchecked="AdaptiveTimingCheck_Changed"/>
+                        <TextBlock Text="Perfil de temporização" FontWeight="Bold" Margin="0,2,0,6"/>
+                        <ComboBox x:Name="TypingProfileCombo">
+                            <ComboBoxItem Content="Legado (padrão — usa intervalos fixos acima)" Tag="Legacy"/>
+                            <ComboBoxItem x:Name="ProfileFastItem" Content="Rápido (Hold 2–4 ms, Gap 3–8 ms)" Tag="Fast"/>
+                            <ComboBoxItem x:Name="ProfileCompatibilityItem" Content="Compatibilidade (Hold 8–15 ms, Gap 25–40 ms)" Tag="Compatibility"/>
+                            <ComboBoxItem x:Name="ProfileNaturalItem" Content="Natural (Hold 30–60 ms, Gap 60–180 ms, correlacionado)" Tag="Natural"/>
+                            <ComboBoxItem x:Name="ProfileCustomItem" Content="Personalizado (Custom)" Tag="Custom"/>
+                        </ComboBox>
+
                         <TextBlock Text="Método de digitação" FontWeight="Bold" Margin="0,16,0,6"/>
                         <ComboBox x:Name="MethodCombo">
                             <ComboBoxItem Content="Automático (recomendado)" Tag="Automatico"/>

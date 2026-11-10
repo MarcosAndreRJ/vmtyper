@@ -86,6 +86,8 @@ public sealed class SettingsTests : IDisposable
             CountdownSeconds = 7,
             Method = InputMethod.TecladoFisico,
             TargetLayout = "00010416",
+            TypingProfile = "Natural",
+            CustomProfile = TypingProfile.Compatibility(seed: 123),
             PreserveOriginalIndentation = true,
             CharacterSubstitutions = new List<CharacterSubstitution>
             {
@@ -185,6 +187,8 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(expected.CountdownSeconds, actual.CountdownSeconds);
         Assert.Equal(expected.Method, actual.Method);
         Assert.Equal(expected.TargetLayout, actual.TargetLayout);
+        Assert.Equal(expected.TypingProfile, actual.TypingProfile);
+        Assert.Equal(expected.CustomProfile, actual.CustomProfile);
         Assert.Equal(expected.PreserveOriginalIndentation, actual.PreserveOriginalIndentation);
         Assert.Equal(expected.EnableTargetGuard, actual.EnableTargetGuard);
         Assert.Equal(expected.ValidateTargetWindow, actual.ValidateTargetWindow);

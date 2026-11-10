@@ -22,6 +22,9 @@ public sealed class TypingSession
     public bool Completed { get; set; }
     public double DurationSeconds { get; set; }
 
+    /// <summary>Métricas numéricas da sessão (Fase 2 §5), sem qualquer texto digitado.</summary>
+    public SessionMetrics? Metrics { get; set; }
+
     public string StatusText => Completed ? "Concluído" : "Cancelado";
 
     public string DisplayText => BlockOrder > 0

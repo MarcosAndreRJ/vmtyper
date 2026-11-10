@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using VmTyper.Helpers;
 using VmTyper.Models;
 using VmTyper.Native;
@@ -6,36 +5,43 @@ using VmTyper.Native;
 namespace VmTyper.Services;
 
 /// <summary>
-/// Implementação de referência de <see cref="IKeyboardInputService"/> baseada em
-/// <see cref="KeyStrokePlanner"/> (§2.1) e <see cref="KeyStrokeExecutor"/> +
-/// <see cref="InjectedKeyTracker"/> (§2.2).
+/// Fachada de <see cref="IKeyboardInputService"/> sobre <see cref="KeyStrokePlanner"/>,
+/// <see cref="KeyStrokeExecutor"/> e <see cref="TypingScheduler"/> (Fase 2 §4).
 /// </summary>
 public sealed class KeyboardInputService : IKeyboardInputService
 {
+    private static readonly HighResolutionDelayProvider SharedDelayProvider = new();
+
     private readonly KeyboardMappingService _mapping;
     private readonly LogService _log;
     private readonly IInputInjector _injector;
     private readonly IKeyboardLayoutProvider _layoutProvider;
+    private readonly IDelayProvider _delayProvider;
     private readonly KeyStrokePlanner _planner;
     private readonly InjectedKeyTracker _tracker = new();
     private readonly KeyStrokeExecutor _executor;
+    private readonly TypingScheduler _scheduler;
     private int _isTyping;
 
     internal InjectedKeyTracker Tracker => _tracker;
     internal KeyStrokePlanner Planner => _planner;
+    public SessionMetrics? LastSessionMetrics { get; private set; }
 
     internal KeyboardInputService(
         KeyboardMappingService mapping,
         LogService log,
         IInputInjector injector,
-        IKeyboardLayoutProvider layoutProvider)
+        IKeyboardLayoutProvider layoutProvider,
+        IDelayProvider? delayProvider = null)
     {
         _mapping = mapping;
         _log = log;
         _injector = injector;
         _layoutProvider = layoutProvider;
+        _delayProvider = delayProvider ?? SharedDelayProvider;
         _planner = new KeyStrokePlanner(mapping);
-        _executor = new KeyStrokeExecutor(injector, mapping, _tracker, log);
+        _executor = new KeyStrokeExecutor(injector, mapping, _tracker, log, _delayProvider);
+        _scheduler = new TypingScheduler(_planner, _executor, _delayProvider, _log);
     }
 
     public void EmergencyReleaseTrackedKeys()
@@ -54,6 +60,13 @@ public sealed class KeyboardInputService : IKeyboardInputService
             options.IndentationStrategy,
             options.FallbackUnsupportedToUnicode);
         return _planner.Plan(text, planOptions);
+    }
+
+    public DryRunReport DryRun(string text, TypingOptions options)
+    {
+        var plan = Plan(text, options);
+        var profile = options.Profile ?? TypingProfile.Legacy(options.CharDelayMs, options.EnterDelayMs);
+        return TypingScheduler.DryRun(plan, profile);
     }
 
     public async Task TypeTextAsync(
@@ -105,90 +118,15 @@ public sealed class KeyboardInputService : IKeyboardInputService
             _log.Info($"{report.AppliedSubstitutionRules.Count} substituições aplicadas (regras {string.Join(", ", report.AppliedSubstitutionRules)}).");
         }
 
-        int totalUnits = report.TotalUnits;
-        int sent = 0;
-        int skipped = 0;
-        int failed = 0;
-        var stopwatch = Stopwatch.StartNew();
-
-        if (options.DiagnosticMode)
-        {
-            _log.Info($"[Diagnóstico] Início. Total de unidades: {totalUnits}. Método: {options.Method}. PreservarIndentação: {options.PreserveOriginalIndentation}.");
-        }
-
-        try
-        {
-            foreach (var unit in report.Units)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await pauseToken.WaitWhilePausedAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (options.BeforeUnitAsync is not null)
-                {
-                    await options.BeforeUnitAsync(unit.Index, cancellationToken).ConfigureAwait(false);
-                    await pauseToken.WaitWhilePausedAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-
-                var result = _executor.ExecuteUnit(unit);
-                switch (result.Outcome)
-                {
-                    case UnitOutcome.Sent:
-                        sent++;
-                        break;
-                    case UnitOutcome.Skipped:
-                        skipped++;
-                        _log.Warn($"Unidade #{unit.Index} não suportada pelo layout ativo e ignorada (Categoria={LogService.Categorize(unit.Text)}).");
-                        break;
-                    case UnitOutcome.Failed:
-                        failed++;
-                        throw new InvalidOperationException(result.ErrorMessage ?? $"Falha ao enviar unidade #{unit.Index} (erro Win32: {result.NativeError}).");
-                }
-
-                if (options.DiagnosticMode)
-                {
-                    var firstScan = unit.Events.FirstOrDefault(e => e.Kind == KeyEventKind.Down);
-                    _log.Info($"[Diagnóstico] Index={unit.Index} Categoria={LogService.Categorize(unit.Text)} Método={unit.Kind} Enc={firstScan.Enc} Code=0x{firstScan.Code:X4} Eventos={result.EventsSent}");
-                    if (_log.DetailedTrace)
-                    {
-                        _log.TraceSensitive($"[Diagnóstico] Index={unit.Index} Grapheme='{Display(unit.Text)}' Método={unit.Kind}");
-                    }
-                }
-
-                progress?.Report(new TypingProgress
-                {
-                    TotalUnits = totalUnits,
-                    Sent = sent,
-                    Skipped = skipped,
-                    Failed = failed,
-                    Elapsed = stopwatch.Elapsed,
-                    CharactersPerSecond = stopwatch.Elapsed.TotalSeconds > 0
-                        ? sent / stopwatch.Elapsed.TotalSeconds
-                        : 0
-                });
-
-                int delay = unit.IsLineBreak ? options.EnterDelayMs : options.CharDelayMs;
-                if (delay > 0)
-                {
-                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-        finally
-        {
-            // §2.2 itens 5 e 6: solta somente o que o tracker contém (zero KeyUp órfão em sucesso).
-            _tracker.ReleaseAll(_injector, _log);
-        }
+        var profile = options.Profile ?? TypingProfile.Legacy(options.CharDelayMs, options.EnterDelayMs);
+        LastSessionMetrics = await _scheduler.ExecuteAsync(
+            report,
+            options,
+            profile,
+            progress,
+            pauseToken,
+            cancellationToken).ConfigureAwait(false);
     }
-
-    private static string Display(string g) => g switch
-    {
-        "\n" => "\\n",
-        "\r" => "\\r",
-        "\t" => "\\t",
-        _ => g
-    };
 
     /// <summary>
     /// Normaliza todas as variantes de quebra de linha (\r\n, \r, \n) para

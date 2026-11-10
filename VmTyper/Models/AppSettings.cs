@@ -72,6 +72,8 @@ public sealed class AppSettings
     public int EnterDelayMs { get; set; } = 20;
     public InputMethod Method { get; set; } = InputMethod.Automatico;
     public int CountdownSeconds { get; set; } = 3;
+    public string TypingProfile { get; set; } = "Legacy";
+    public TypingProfile? CustomProfile { get; set; }
 
     /// <summary>
     /// Ao iniciar uma nova linha, remove a autoindentação do editor de

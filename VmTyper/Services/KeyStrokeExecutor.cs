@@ -146,22 +146,39 @@ internal sealed class KeyStrokeExecutor
     private readonly KeyboardMappingService _mapping;
     private readonly InjectedKeyTracker _tracker;
     private readonly LogService _log;
-    private readonly Action<int> _holdDelay;
+    private readonly Action<TimeSpan> _holdDelay;
+    private readonly Func<long> _timestamp;
 
     public InjectedKeyTracker Tracker => _tracker;
+    internal IInputInjector Injector => _injector;
 
     public KeyStrokeExecutor(
         IInputInjector injector,
         KeyboardMappingService mapping,
         InjectedKeyTracker tracker,
         LogService log,
+        IDelayProvider? delayProvider = null,
         Action<int>? holdDelay = null)
     {
         _injector = injector;
         _mapping = mapping;
         _tracker = tracker;
         _log = log;
-        _holdDelay = holdDelay ?? PreciseDelay;
+        if (delayProvider is not null)
+        {
+            _holdDelay = delayProvider.HoldExact;
+            _timestamp = delayProvider.Timestamp;
+        }
+        else if (holdDelay is not null)
+        {
+            _holdDelay = ts => holdDelay((int)Math.Round(ts.TotalMilliseconds));
+            _timestamp = Stopwatch.GetTimestamp;
+        }
+        else
+        {
+            _holdDelay = ts => PreciseDelay((int)Math.Round(ts.TotalMilliseconds));
+            _timestamp = Stopwatch.GetTimestamp;
+        }
     }
 
     /// <summary>
@@ -199,12 +216,15 @@ internal sealed class KeyStrokeExecutor
         return false;
     }
 
+    public UnitResult ExecuteUnit(InputUnit unit, int holdDurationMs = DefaultKeyPressDurationMs) =>
+        ExecuteUnit(unit, TimeSpan.FromMilliseconds(holdDurationMs));
+
     /// <summary>
     /// Executa uma única <see cref="InputUnit"/>. Cada KeyDown e cada KeyUp vai em
     /// uma chamada <c>SendInput</c> de 1 evento; o <c>finally</c> da unidade garante
     /// <c>_tracker.ReleaseAll()</c> caso qualquer evento falhe (§2.2 itens 2–5).
     /// </summary>
-    public UnitResult ExecuteUnit(InputUnit unit, int holdDurationMs = DefaultKeyPressDurationMs)
+    public UnitResult ExecuteUnit(InputUnit unit, TimeSpan holdDuration)
     {
         if (unit.Kind == UnitKind.Unsupported || unit.Events.Count == 0)
         {
@@ -224,7 +244,7 @@ internal sealed class KeyStrokeExecutor
                 bool prevWasDown = i > 0 && unit.Events[i - 1].Kind == KeyEventKind.Down;
                 if (ev.Kind == KeyEventKind.Up && prevWasDown)
                 {
-                    _holdDelay(holdDurationMs);
+                    _holdDelay(holdDuration);
                 }
 
                 single[0] = ev.Kind == KeyEventKind.Down
@@ -232,7 +252,7 @@ internal sealed class KeyStrokeExecutor
                     : InjectedKeyTracker.BuildUpInput(ev.Code, ev.Extended, ev.Enc);
 
                 uint sent = _injector.Send(single);
-                long now = Stopwatch.GetTimestamp();
+                long now = _timestamp();
 
                 if (sent == 1)
                 {

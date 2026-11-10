@@ -459,6 +459,7 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
+            var resolvedProfile = TypingProfile.Resolve(Settings);
             var baseOptions = new TypingOptions
             {
                 CharDelayMs = Settings.CharDelayMs,
@@ -467,11 +468,13 @@ public sealed class MainViewModel : ObservableObject
                 TargetLayout = Settings.TargetLayout,
                 PreserveOriginalIndentation = Settings.PreserveOriginalIndentation,
                 IndentationStrategy = IndentationResetStrategy.Auto,
-                Substitutions = Settings.CharacterSubstitutions
+                Substitutions = Settings.CharacterSubstitutions,
+                Profile = resolvedProfile
             };
 
-            // §2.1 (E): Pré-voo — se houver unidades Unsupported, a sessão não começa em silêncio.
+            // §2.1 (E) e F2 §4: Pré-voo — calcula unidades e duração estimada.
             var preflight = _typingService.Plan(textToType, baseOptions);
+            var dryRun = TypingScheduler.DryRun(preflight, resolvedProfile);
             bool fallbackUnicode = false;
             if (preflight.UnsupportedCount > 0)
             {
@@ -497,7 +500,7 @@ public sealed class MainViewModel : ObservableObject
             _activeBlockId = blockId;
             typingStarted = true;
             State = TypingState.Digitando;
-            StatusMessage = $"Digitando Bloco {blockOrder}...";
+            StatusMessage = $"Digitando Bloco {blockOrder} (estimativa: ~{dryRun.EstimatedDuration.TotalSeconds:0.0}s)...";
 
             var options = new TypingOptions
             {
@@ -509,6 +512,7 @@ public sealed class MainViewModel : ObservableObject
                 PreserveOriginalIndentation = baseOptions.PreserveOriginalIndentation,
                 IndentationStrategy = baseOptions.IndentationStrategy,
                 Substitutions = baseOptions.Substitutions,
+                Profile = resolvedProfile,
                 BeforeUnitAsync = Settings.EnableTargetGuard
                     ? (unitIdx, ct) => CheckTargetGuardBeforeUnitAsync(lease, unitIdx, ct)
                     : null
@@ -593,6 +597,12 @@ public sealed class MainViewModel : ObservableObject
 
     private void AddHistoryEntry(Guid sessionId, Guid blockId, int blockOrder, int characterCount, bool completed, double durationSeconds)
     {
+        SessionMetrics? metrics = null;
+        if (_typingService is KeyboardInputService kis && kis.LastSessionMetrics is not null)
+        {
+            metrics = kis.LastSessionMetrics with { TargetLostIncidents = _targetGuard.Incidents.Count };
+        }
+
         var entry = new TypingSession
         {
             SessionId = sessionId,
@@ -601,7 +611,8 @@ public sealed class MainViewModel : ObservableObject
             BlockOrder = blockOrder,
             CharacterCount = characterCount,
             Completed = completed,
-            DurationSeconds = durationSeconds
+            DurationSeconds = durationSeconds,
+            Metrics = metrics
         };
         History.Insert(0, entry);
         while (History.Count > 50) History.RemoveAt(History.Count - 1);

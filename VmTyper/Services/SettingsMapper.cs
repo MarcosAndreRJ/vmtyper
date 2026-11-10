@@ -14,6 +14,9 @@ public sealed class SettingsFormState
     public string CountdownText { get; set; } = "3";
     public string MethodTag { get; set; } = "Automatico";
     public string TargetLayoutTag { get; set; } = "HostForeground";
+    public bool AdaptiveTiming { get; set; }
+    public string TypingProfileTag { get; set; } = "Legacy";
+    public TypingProfile? CustomProfile { get; set; }
     public bool PreserveOriginalIndentation { get; set; }
     public List<CharacterSubstitution> Substitutions { get; set; } = new();
     public HotkeyDefinition StartHotkey { get; set; } = new() { Ctrl = true, Shift = true, VirtualKey = 0x0D };
@@ -52,6 +55,9 @@ public static class SettingsMapper
             CountdownText = s.CountdownSeconds.ToString(),
             MethodTag = s.Method.ToString(),
             TargetLayoutTag = string.IsNullOrWhiteSpace(s.TargetLayout) ? "HostForeground" : s.TargetLayout,
+            AdaptiveTiming = s.Features.AdaptiveTiming,
+            TypingProfileTag = string.IsNullOrWhiteSpace(s.TypingProfile) ? "Legacy" : s.TypingProfile,
+            CustomProfile = s.CustomProfile,
             PreserveOriginalIndentation = s.PreserveOriginalIndentation,
             Substitutions = s.CharacterSubstitutions.Select(CloneSubstitution).ToList(),
             StartHotkey = CloneHotkey(s.StartHotkey),
@@ -124,6 +130,11 @@ public static class SettingsMapper
             _ => InputMethod.Automatico
         };
         result.TargetLayout = string.IsNullOrWhiteSpace(form.TargetLayoutTag) ? "HostForeground" : form.TargetLayoutTag.Trim();
+        result.Features.AdaptiveTiming = form.AdaptiveTiming;
+        result.TypingProfile = form.AdaptiveTiming
+            ? (string.IsNullOrWhiteSpace(form.TypingProfileTag) ? "Legacy" : form.TypingProfileTag.Trim())
+            : "Legacy";
+        result.CustomProfile = form.CustomProfile;
         result.PreserveOriginalIndentation = form.PreserveOriginalIndentation;
         result.CharacterSubstitutions = activeSubs;
         result.StartHotkey = CloneHotkey(form.StartHotkey);
@@ -179,6 +190,8 @@ public static class SettingsMapper
         EnterDelayMs = s.EnterDelayMs,
         Method = s.Method,
         CountdownSeconds = s.CountdownSeconds,
+        TypingProfile = s.TypingProfile,
+        CustomProfile = s.CustomProfile,
         PreserveOriginalIndentation = s.PreserveOriginalIndentation,
         CharacterSubstitutions = s.CharacterSubstitutions.Select(CloneSubstitution).ToList(),
         StartHotkey = CloneHotkey(s.StartHotkey),

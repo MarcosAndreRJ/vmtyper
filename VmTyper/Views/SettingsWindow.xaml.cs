@@ -58,6 +58,9 @@ public partial class SettingsWindow : Window
 
         SelectComboByTag(MethodCombo, form.MethodTag);
         SelectOrSetComboByTag(TargetLayoutCombo, form.TargetLayoutTag);
+        AdaptiveTimingCheck.IsChecked = form.AdaptiveTiming;
+        UpdateProfileItemsVisibility(form.AdaptiveTiming);
+        SelectComboByTag(TypingProfileCombo, form.AdaptiveTiming ? form.TypingProfileTag : "Legacy");
 
         PreserveIndentationCheck.IsChecked = form.PreserveOriginalIndentation;
 
@@ -128,6 +131,9 @@ public partial class SettingsWindow : Window
         CountdownText = CountdownBox.Text,
         MethodTag = ReadComboTagOrText(MethodCombo, "Automatico"),
         TargetLayoutTag = ReadComboTagOrText(TargetLayoutCombo, "HostForeground"),
+        AdaptiveTiming = AdaptiveTimingCheck.IsChecked == true,
+        TypingProfileTag = ReadComboTagOrText(TypingProfileCombo, "Legacy"),
+        CustomProfile = _working.CustomProfile,
         PreserveOriginalIndentation = PreserveIndentationCheck.IsChecked == true,
         Substitutions = _substitutions.Select(SettingsMapper.CloneSubstitution).ToList(),
         StartHotkey = SettingsMapper.CloneHotkey(_startHotkey),
@@ -155,6 +161,25 @@ public partial class SettingsWindow : Window
     {
         CharDelayBox.Text = charDelay.ToString();
         EnterDelayBox.Text = enterDelay.ToString();
+    }
+
+    private void AdaptiveTimingCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        bool enabled = AdaptiveTimingCheck.IsChecked == true;
+        UpdateProfileItemsVisibility(enabled);
+        if (!enabled)
+        {
+            SelectComboByTag(TypingProfileCombo, "Legacy");
+        }
+    }
+
+    private void UpdateProfileItemsVisibility(bool adaptiveEnabled)
+    {
+        var vis = adaptiveEnabled ? Visibility.Visible : Visibility.Collapsed;
+        if (ProfileFastItem is not null) ProfileFastItem.Visibility = vis;
+        if (ProfileCompatibilityItem is not null) ProfileCompatibilityItem.Visibility = vis;
+        if (ProfileNaturalItem is not null) ProfileNaturalItem.Visibility = vis;
+        if (ProfileCustomItem is not null) ProfileCustomItem.Visibility = vis;
     }
 
     // --- Captura de atalhos ---
