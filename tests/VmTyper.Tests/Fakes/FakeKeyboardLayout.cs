@@ -68,13 +68,27 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
         l.AddChar('`', 0xDB, ShiftState);
         l.AddChar('¨', 0x36, ShiftState);
         l.DeadKeys.UnionWith(new[] { '~', '^', '´', '`', '¨' });
-        l._deadVks.UnionWith(new uint[] { 0xDE, 0xDB });
+        l._deadVks.UnionWith(new uint[] { 0xDE, 0xDB, 0x36 });
         l.AddKey('ç', 0xBA, 0x27);
+        l.AddChar('Ç', 0xBA, ShiftState);
         l.AddKey(',', 0xBC, 0x33);
         l.AddKey('.', 0xBE, 0x34);
         l.AddKey(';', 0xBF, 0x35);
+        l.AddChar(':', 0xBF, ShiftState);
         l.AddKey('-', 0xBD, 0x0C);
+        l.AddChar('_', 0xBD, ShiftState);
+        l.AddKey('=', 0xBB, 0x0D);
+        l.AddChar('+', 0xBB, ShiftState);
         l.AddKey('/', 0xC1, 0x73);
+        l.AddChar('!', 0x31, ShiftState);
+        l.AddChar('@', 0x32, ShiftState);
+        l.AddChar('#', 0x33, ShiftState);
+        l.AddChar('$', 0x34, ShiftState);
+        l.AddChar('%', 0x35, ShiftState);
+        l.AddChar('&', 0x37, ShiftState);
+        l.AddChar('*', 0x38, ShiftState);
+        l.AddChar('(', 0x39, ShiftState);
+        l.AddChar(')', 0x30, ShiftState);
         return l;
     }
 
@@ -142,4 +156,121 @@ internal sealed class FakeKeyboardLayout : IKeyboardLayoutProvider
     }
 
     public bool IsExtendedVk(uint vk) => _extendedVks.Contains(vk);
+
+    /// <summary>
+    /// Decodifica o fluxo de <see cref="RecordedInput"/> como um receptor Windows
+    /// com este layout, incluindo composição de teclas mortas e pares substitutos Unicode.
+    /// </summary>
+    public string Decode(IReadOnlyList<RecordedInput> events)
+    {
+        var sb = new System.Text.StringBuilder();
+        bool shift = false;
+        char? pendingDead = null;
+
+        var charByScanAndShift = new Dictionary<(ushort scan, byte shift), char>();
+        foreach (var (ch, (vk, st)) in _chars)
+        {
+            if (_scanByVk.TryGetValue(vk, out ushort sc))
+            {
+                charByScanAndShift[(sc, st)] = ch;
+            }
+        }
+
+        foreach (var e in events)
+        {
+            if (e.IsUnicode)
+            {
+                if (!e.IsKeyUp)
+                {
+                    if (pendingDead is char d)
+                    {
+                        sb.Append(d);
+                        pendingDead = null;
+                    }
+                    sb.Append((char)e.Scan);
+                }
+                continue;
+            }
+
+            ushort scan = e.IsScanCode ? e.Scan : (_scanByVk.TryGetValue(e.Vk, out var s) ? s : (ushort)0);
+
+            if (scan is ScanLShift or 0x36)
+            {
+                shift = !e.IsKeyUp;
+                continue;
+            }
+
+            if (e.IsKeyUp) continue;
+
+            if (scan == 0x1C) // Enter
+            {
+                if (pendingDead is char d) { sb.Append(d); pendingDead = null; }
+                sb.Append('\n');
+                continue;
+            }
+            if (scan == 0x0F) // Tab
+            {
+                if (pendingDead is char d) { sb.Append(d); pendingDead = null; }
+                sb.Append('\t');
+                continue;
+            }
+
+            byte st = shift ? ShiftState : (byte)0;
+            if (!charByScanAndShift.TryGetValue((scan, st), out char ch))
+            {
+                continue;
+            }
+
+            if (pendingDead is char dead)
+            {
+                pendingDead = null;
+                if (ch == ' ')
+                {
+                    sb.Append(dead);
+                }
+                else if (TryComposeDeadKey(dead, ch, out char composed))
+                {
+                    sb.Append(composed);
+                }
+                else
+                {
+                    sb.Append(dead);
+                    sb.Append(ch);
+                }
+            }
+            else if (DeadKeys.Contains(ch))
+            {
+                pendingDead = ch;
+            }
+            else
+            {
+                sb.Append(ch);
+            }
+        }
+
+        if (pendingDead is char trailing)
+        {
+            sb.Append(trailing);
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool TryComposeDeadKey(char dead, char baseChar, out char composed)
+    {
+        composed = (dead, baseChar) switch
+        {
+            ('´', 'a') => 'á', ('´', 'e') => 'é', ('´', 'i') => 'í', ('´', 'o') => 'ó', ('´', 'u') => 'ú',
+            ('´', 'A') => 'Á', ('´', 'E') => 'É', ('´', 'I') => 'Í', ('´', 'O') => 'Ó', ('´', 'U') => 'Ú',
+            ('`', 'a') => 'à', ('`', 'e') => 'è', ('`', 'i') => 'ì', ('`', 'o') => 'ò', ('`', 'u') => 'ù',
+            ('`', 'A') => 'À', ('`', 'E') => 'È', ('`', 'I') => 'Ì', ('`', 'O') => 'Ò', ('`', 'U') => 'Ù',
+            ('~', 'a') => 'ã', ('~', 'o') => 'õ', ('~', 'n') => 'ñ',
+            ('~', 'A') => 'Ã', ('~', 'O') => 'Õ', ('~', 'N') => 'Ñ',
+            ('^', 'a') => 'â', ('^', 'e') => 'ê', ('^', 'i') => 'î', ('^', 'o') => 'ô', ('^', 'u') => 'û',
+            ('^', 'A') => 'Â', ('^', 'E') => 'Ê', ('^', 'I') => 'Î', ('^', 'O') => 'Ô', ('^', 'U') => 'Û',
+            ('¨', 'u') => 'ü', ('¨', 'U') => 'Ü',
+            _ => '\0'
+        };
+        return composed != '\0';
+    }
 }

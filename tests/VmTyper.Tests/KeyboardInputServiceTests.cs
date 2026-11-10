@@ -361,4 +361,33 @@ public sealed class KeyboardInputServiceTests : IDisposable
             KeyStrokeExecutor.PhysicalModifierTimeout = previousTimeout;
         }
     }
+
+    [Theory]
+    [InlineData("basico.txt", InputMethod.TecladoFisico)]
+    [InlineData("basico.txt", InputMethod.Unicode)]
+    [InlineData("acentuacao.txt", InputMethod.TecladoFisico)]
+    [InlineData("acentuacao.txt", InputMethod.Unicode)]
+    [InlineData("teclas-mortas.txt", InputMethod.TecladoFisico)]
+    [InlineData("teclas-mortas.txt", InputMethod.Unicode)]
+    public async Task Corpus_BasicAccentedAndDeadKeys_DecodedIdentically_InPhysicalAndUnicodeModes(
+        string corpusFile, InputMethod method)
+    {
+        string corpusPath = System.IO.Path.Combine(AppContext.BaseDirectory, "corpora", corpusFile);
+        string corpus = KeyboardInputService.NormalizeLineEndings(await System.IO.File.ReadAllTextAsync(corpusPath)).TrimEnd('\n');
+
+        using var h = new EngineHarness(FakeKeyboardLayout.Abnt2());
+        var progress = new SyncProgress<TypingProgress>();
+        await h.TypeAsync(corpus, EngineHarness.Options(method: method), progress);
+
+        var analysis = h.Analyze();
+        Assert.Empty(analysis.StuckKeys);
+        Assert.Empty(analysis.OrphanKeyUps);
+        Assert.Empty(analysis.MismatchedReleases);
+        Assert.Equal(0, progress.Last.Skipped);
+        Assert.Equal(0, progress.Last.Failed);
+        Assert.Equal(progress.Last.TotalUnits, progress.Last.Sent);
+
+        string decoded = h.Layout.Decode(h.Injector.Delivered);
+        Assert.Equal(corpus, decoded);
+    }
 }

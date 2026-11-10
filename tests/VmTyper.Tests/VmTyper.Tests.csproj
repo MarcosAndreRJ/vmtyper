@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="..\corpora\*.txt" Link="corpora\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

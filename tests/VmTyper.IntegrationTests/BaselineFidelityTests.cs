@@ -23,9 +23,19 @@ public sealed class IntegrationFactAttribute : FactAttribute
     }
 }
 
+public sealed class IntegrationTheoryAttribute : TheoryAttribute
+{
+    public IntegrationTheoryAttribute()
+    {
+        if (Environment.GetEnvironmentVariable(IntegrationFactAttribute.Variable) != "1")
+        {
+            Skip = $"Injeta teclado real na sessão interativa; defina {IntegrationFactAttribute.Variable}=1 com o desktop desbloqueado e sem mexer no teclado/mouse.";
+        }
+    }
+}
+
 /// <summary>
-/// Passo 0.7: digita o corpus básico no receptor local com o motor v1 e
-/// compara o que chegou. O resultado é a linha de base de fidelidade.
+/// Passo 0.7 e Fase 1: digita os corpora no receptor local e verifica fidelidade e TargetGuard.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class BaselineFidelityTests
@@ -45,9 +55,7 @@ public sealed class BaselineFidelityTests
         receiver.Send("ACTIVATE");
         await Task.Delay(500);
 
-        // Proteção: o motor v1 não monitora o destino (defeito C). Se o receptor não
-        // estiver em primeiro plano agora, nada é digitado.
-        Assert.True(receiver.IsForeground(), "O receptor não ficou em primeiro plano; nenhuma tecla foi enviada.");
+        Assert.True(receiver.IsForeground(), $"O receptor não ficou em primeiro plano ({receiver.DescribeForeground()}); nenhuma tecla foi enviada.");
 
         using var dir = new TempDir();
         var log = TestLog.Create(dir);
@@ -71,10 +79,10 @@ public sealed class BaselineFidelityTests
 
         string outDir = Path.Combine(AppContext.BaseDirectory, "baseline");
         Directory.CreateDirectory(outDir);
-        string outFile = Path.Combine(outDir, $"fidelity-v1-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        string outFile = Path.Combine(outDir, $"fidelity-f1-{DateTime.Now:yyyyMMdd-HHmmss}.json");
         await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(new
         {
-            engine = "v1",
+            engine = "v2-f1",
             options.CharDelayMs,
             options.EnterDelayMs,
             method = options.Method.ToString(),
@@ -89,9 +97,122 @@ public sealed class BaselineFidelityTests
         _output.WriteLine($"Resultado salvo em {outFile}");
         _output.WriteLine(diff.Count == 0 ? "Texto idêntico." : string.Join(Environment.NewLine, diff));
 
-        // A linha de base registra o que acontece; os defeitos conhecidos (N1 etc.)
-        // fazem o texto divergir, e isso é o dado, não uma falha do teste.
-        Assert.False(string.IsNullOrEmpty(received), "Nada chegou ao receptor.");
+        Assert.Equal(corpus, received);
+    }
+
+    [IntegrationTheory]
+    [InlineData("basico.txt", InputMethod.TecladoFisico)]
+    [InlineData("basico.txt", InputMethod.Unicode)]
+    [InlineData("acentuacao.txt", InputMethod.TecladoFisico)]
+    [InlineData("acentuacao.txt", InputMethod.Unicode)]
+    [InlineData("teclas-mortas.txt", InputMethod.TecladoFisico)]
+    [InlineData("teclas-mortas.txt", InputMethod.Unicode)]
+    public async Task Corpus_ReachesReceiverIdentically_InBothModes(string corpusFile, InputMethod method)
+    {
+        string corpus = KeyboardInputService.NormalizeLineEndings(
+            await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "corpora", corpusFile))).TrimEnd('\n');
+
+        using var receiver = ReceiverProcess.Start(hook: true);
+        receiver.Send("CLEAR");
+        receiver.Send("ACTIVATE");
+        await Task.Delay(500);
+
+        Assert.True(receiver.IsForeground(), $"O receptor não ficou em primeiro plano ({receiver.DescribeForeground()}); nenhuma tecla foi enviada.");
+
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        var engine = new KeyboardInputService(
+            new KeyboardMappingService(Win32KeyboardLayoutProvider.Instance), log,
+            Win32InputInjector.Instance, Win32KeyboardLayoutProvider.Instance);
+        var options = new TypingOptions
+        {
+            CharDelayMs = 8,
+            EnterDelayMs = 25,
+            Method = method,
+            TargetLayout = "HostForeground"
+        };
+
+        await engine.TypeTextAsync(corpus, options, null, PauseToken.None, CancellationToken.None);
+        await Task.Delay(500);
+
+        var result = receiver.Export();
+        string received = KeyboardInputService.NormalizeLineEndings(result.Text);
+        var diff = TextDiff.Describe(corpus, received);
+        _output.WriteLine($"{corpusFile} ({method}): {(diff.Count == 0 ? "idêntico" : string.Join(" | ", diff))}");
+
+        Assert.Equal(corpus, received);
+    }
+
+    [IntegrationFact]
+    public async Task SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars()
+    {
+        using var receiver1 = ReceiverProcess.Start(hook: true);
+        using var receiver2 = ReceiverProcess.Start(hook: true);
+
+        receiver1.Send("CLEAR");
+        receiver2.Send("CLEAR");
+        receiver1.Send("ACTIVATE");
+        await Task.Delay(500);
+
+        Assert.True(receiver1.IsForeground(), "O receptor 1 não ficou em primeiro plano.");
+
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        using var guard = new TargetGuard(Win32ForegroundWindowProvider.Instance, log);
+        var anchorRes = guard.TryCaptureAnchor(validateBrowser: false, ExpectedBrowser.Nenhum);
+        Assert.True(anchorRes.IsValid, anchorRes.ErrorMessage);
+
+        var pauseSource = new PauseTokenSource();
+        using var cts = new CancellationTokenSource();
+        TargetLostIncident? lostIncident = null;
+
+        var engine = new KeyboardInputService(
+            new KeyboardMappingService(Win32KeyboardLayoutProvider.Instance), log,
+            Win32InputInjector.Instance, Win32KeyboardLayoutProvider.Instance);
+
+        var progress = new DirectProgress<TypingProgress>(p =>
+        {
+            if (p.Sent == 3)
+            {
+                receiver2.Send("ACTIVATE");
+                Thread.Sleep(150);
+            }
+            var check = guard.CheckBeforeUnit(p.Sent, strictTitleMode: false);
+            if (check.Status == TargetCheckStatus.TargetLost)
+            {
+                lostIncident ??= check.Incident;
+                pauseSource.Pause();
+            }
+        });
+
+        var options = new TypingOptions
+        {
+            CharDelayMs = 25,
+            EnterDelayMs = 25,
+            Method = InputMethod.TecladoFisico
+        };
+
+        var typingTask = engine.TypeTextAsync("abcdefghij", options, progress, pauseSource.Token, cts.Token);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!pauseSource.IsPaused && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.True(pauseSource.IsPaused, "A sessão deveria ter pausado quando o segundo receptor assumiu o primeiro plano.");
+        Assert.NotNull(lostIncident);
+
+        // Cancela a sessão pausada e aguarda encerramento limpo.
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => typingTask);
+
+        await Task.Delay(300);
+        var exp1 = receiver1.Export();
+        var exp2 = receiver2.Export();
+
+        Assert.Equal("abc", exp1.Text);
+        Assert.Equal(string.Empty, exp2.Text);
     }
 }
 

@@ -70,6 +70,14 @@ internal sealed class ReceiverProcess : IDisposable
         return pid == (uint)_process.Id;
     }
 
+    public string DescribeForeground()
+    {
+        IntPtr hwnd = Win32.GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return "HWND=0x0";
+        Win32.GetWindowThreadProcessId(hwnd, out uint pid);
+        return $"HWND=0x{hwnd:X}, fgPid={pid}, receiverPid={_process.Id}";
+    }
+
     private static string LocateExe()
     {
         var overridePath = Environment.GetEnvironmentVariable(ExeVariable);

@@ -1,9 +1,11 @@
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace VmTyper.TestReceiver;
@@ -160,11 +162,7 @@ internal sealed class ReceiverWindow : Window
                 Clear();
                 return "OK";
             case "ACTIVATE":
-                if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-                Activate();
-                _textBox.Focus();
-                Keyboard.Focus(_textBox);
-                _textBox.CaretIndex = _textBox.Text.Length;
+                ForceForeground();
                 return "OK";
             case "EXPORT":
                 return Serialize();
@@ -175,4 +173,63 @@ internal sealed class ReceiverWindow : Window
                 return "ERR comando desconhecido";
         }
     }
+
+    private void ForceForeground()
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        IntPtr hwnd = new WindowInteropHelper(this).Handle;
+        IntPtr fg = GetForegroundWindow();
+        uint curThread = GetCurrentThreadId();
+        uint fgThread = fg != IntPtr.Zero ? GetWindowThreadProcessId(fg, out _) : 0;
+
+        bool attached = false;
+        if (fgThread != 0 && fgThread != curThread)
+        {
+            attached = AttachThreadInput(fgThread, curThread, true);
+        }
+
+        try
+        {
+            // Desbloqueia a trava de foreground do Windows para processos iniciados por CLI de teste.
+            keybd_event(0x12, 0, 0x0002, UIntPtr.Zero); // VK_MENU KeyUp
+            Topmost = true;
+            Show();
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            SwitchToThisWindow(hwnd, true);
+            Activate();
+        }
+        finally
+        {
+            if (attached) AttachThreadInput(fgThread, curThread, false);
+        }
+
+        _textBox.Focus();
+        Keyboard.Focus(_textBox);
+        _textBox.CaretIndex = _textBox.Text.Length;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    [DllImport("user32.dll")]
+    private static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
 }
