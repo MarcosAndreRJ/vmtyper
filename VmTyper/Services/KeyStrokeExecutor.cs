@@ -267,6 +267,11 @@ internal sealed class KeyStrokeExecutor
                         tsUp = now;
                         _tracker.Remove(ev.Code, ev.Extended, ev.Enc);
                     }
+
+                    if (ev.DelayAfterMs > 0)
+                    {
+                        _holdDelay(TimeSpan.FromMilliseconds(ev.DelayAfterMs));
+                    }
                 }
                 else
                 {
@@ -287,6 +292,33 @@ internal sealed class KeyStrokeExecutor
             // Se houve falha parcial ou exceção, solta apenas o que ficou preso no tracker.
             _tracker.ReleaseAll(_injector, _log);
         }
+    }
+
+    /// <summary>
+    /// Limpa qualquer estado residual de tecla morta pendente no SO de destino enviando
+    /// Space e Backspace (§Tarefa 3), evitando que caracteres acentuados contaminem
+    /// digitações subsequentes.
+    /// </summary>
+    public void FlushDeadKeyState(IntPtr layout)
+    {
+        var (spaceScan, spaceExt) = _mapping.ResolveScan(Win32.VK_SPACE, layout);
+        var (backScan, backExt) = _mapping.ResolveScan(Win32.VK_BACK, layout);
+
+        Span<Win32.INPUT> single = stackalloc Win32.INPUT[1];
+        // Space Down + Up
+        single[0] = InjectedKeyTracker.BuildDownInput(spaceScan, spaceExt, KeyEncoding.Scan);
+        _injector.Send(single);
+        _holdDelay(TimeSpan.FromMilliseconds(DefaultKeyPressDurationMs));
+        single[0] = InjectedKeyTracker.BuildUpInput(spaceScan, spaceExt, KeyEncoding.Scan);
+        _injector.Send(single);
+        _holdDelay(TimeSpan.FromMilliseconds(DefaultKeyPressDurationMs));
+
+        // Backspace Down + Up
+        single[0] = InjectedKeyTracker.BuildDownInput(backScan, backExt, KeyEncoding.Scan);
+        _injector.Send(single);
+        _holdDelay(TimeSpan.FromMilliseconds(DefaultKeyPressDurationMs));
+        single[0] = InjectedKeyTracker.BuildUpInput(backScan, backExt, KeyEncoding.Scan);
+        _injector.Send(single);
     }
 
     public static void PreciseDelay(int milliseconds)

@@ -53,6 +53,12 @@ public sealed class KeyboardInputService : IKeyboardInputService
         _tracker.ReleaseAll(_injector, _log);
     }
 
+    public void FlushDeadKeyState()
+    {
+        var layout = _layoutProvider.GetLayout();
+        _executor.FlushDeadKeyState(layout);
+    }
+
     public PreflightReport Plan(string text, TypingOptions options)
     {
         var layout = _mapping.GetLayout(options.TargetLayout);

@@ -48,6 +48,7 @@ public partial class DiagnosticsWindow : Window
         UpdateExpectedFingerprint();
         ViewModel.LoadLatestSessionFromDirectory();
         ViewModel.LoadBenchmarksFromDirectory();
+        ViewModel.InitializeCalibration();
 
         Closing += (_, _) =>
         {
@@ -196,5 +197,197 @@ public partial class DiagnosticsWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         _activeLease?.Cancel();
+    }
+
+    // ===============================================================
+    // Calibração e Diagnósticos da Barra e Acentuação (§Tarefas 1, 3 e 4)
+    // ===============================================================
+
+    private async Task ExecuteCandidateAttemptAsync(CharacterSubstitution candidateSub, string label)
+    {
+        using var lease = _coordinator.TryBegin("Diagnostics");
+        if (lease is null)
+        {
+            ViewModel.CalibrationStatusMessage = "Já existe uma sessão de digitação ativa no aplicativo.";
+            return;
+        }
+
+        _activeLease = lease;
+        var token = lease.Token;
+
+        try
+        {
+            for (int i = 3; i > 0; i--)
+            {
+                ViewModel.CalibrationStatusMessage = $"[Foco no console da VM] Enviando em {i}...";
+                await Task.Delay(1000, token);
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token);
+            }
+            ViewModel.CalibrationStatusMessage = $"Enviando tentativa: {label}...";
+
+            var options = new TypingOptions
+            {
+                CharDelayMs = 15,
+                EnterDelayMs = 30,
+                Method = InputMethod.TecladoFisico,
+                DiagnosticMode = true,
+                Substitutions = new List<CharacterSubstitution> { candidateSub }
+            };
+
+            _log.Info($"=== Início da tentativa de calibração: {label} ===");
+            await _typingService.TypeTextAsync(candidateSub.From, options, null, lease.Pause, token);
+            _log.Info($"=== Fim da tentativa de calibração: {label} ===");
+
+            ViewModel.CalibrationStatusMessage = $"Tentativa '{label}' enviada. Digite o que apareceu na VM abaixo.";
+            ViewModel.LoadLatestSessionFromDirectory();
+        }
+        catch (OperationCanceledException)
+        {
+            ViewModel.CalibrationStatusMessage = "Tentativa cancelada.";
+            _log.Info($"Tentativa de calibração '{label}' cancelada.");
+        }
+        catch (Exception ex)
+        {
+            ViewModel.CalibrationStatusMessage = $"Erro: {ex.Message}";
+            _log.Error($"Erro na tentativa '{label}': {ex.Message}");
+        }
+        finally
+        {
+            _activeLease = null;
+        }
+    }
+
+    private async void QuickTestNumpadDivide_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = VmSlashAndAccentCandidates.GetSlashCandidates();
+        var numpadCandidate = candidates.FirstOrDefault(c => c.Id == "NumpadDivide");
+        if (numpadCandidate is not null)
+        {
+            await ExecuteCandidateAttemptAsync(numpadCandidate.SubstitutionTemplate, numpadCandidate.Name);
+        }
+    }
+
+    private async void QuickTestAbnt2Slash_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = VmSlashAndAccentCandidates.GetSlashCandidates();
+        var abntCandidate = candidates.FirstOrDefault(c => c.Id == "Abnt2Slash");
+        if (abntCandidate is not null)
+        {
+            await ExecuteCandidateAttemptAsync(abntCandidate.SubstitutionTemplate, abntCandidate.Name);
+        }
+    }
+
+    private async void QuickTestUsSlash_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = VmSlashAndAccentCandidates.GetSlashCandidates();
+        var usCandidate = candidates.FirstOrDefault(c => c.Id == "UsSlash");
+        if (usCandidate is not null)
+        {
+            await ExecuteCandidateAttemptAsync(usCandidate.SubstitutionTemplate, usCandidate.Name);
+        }
+    }
+
+    private async void QuickTestAltGrQ_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = VmSlashAndAccentCandidates.GetSlashCandidates();
+        var altGrCandidate = candidates.FirstOrDefault(c => c.Id == "AltGrQ");
+        if (altGrCandidate is not null)
+        {
+            await ExecuteCandidateAttemptAsync(altGrCandidate.SubstitutionTemplate, altGrCandidate.Name);
+        }
+    }
+
+    private async void QuickTestAltNumpad47_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = VmSlashAndAccentCandidates.GetSlashCandidates();
+        var altNumpadCandidate = candidates.FirstOrDefault(c => c.Id == "AltNumpad47");
+        if (altNumpadCandidate is not null)
+        {
+            await ExecuteCandidateAttemptAsync(altNumpadCandidate.SubstitutionTemplate, altNumpadCandidate.Name);
+        }
+    }
+
+    private void FlushDeadKey_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _typingService.FlushDeadKeyState();
+            ViewModel.CalibrationStatusMessage = "Sequência de limpeza de tecla morta (Space + Backspace) enviada com sucesso.";
+            _log.Info("Limpeza de teclas mortas acionada manualmente.");
+        }
+        catch (Exception ex)
+        {
+            ViewModel.CalibrationStatusMessage = $"Falha ao limpar teclas mortas: {ex.Message}";
+            _log.Error($"Falha na limpeza de tecla morta: {ex.Message}");
+        }
+    }
+
+    private async void SendCalibrationAttempt_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedCandidate is null)
+        {
+            ViewModel.CalibrationStatusMessage = "Nenhum candidato selecionado.";
+            return;
+        }
+
+        var candidate = ViewModel.SelectedCandidate;
+        var sub = SettingsMapper.CloneSubstitution(candidate.SubstitutionTemplate);
+        sub.From = ViewModel.SelectedCalibrationSymbol;
+
+        await ExecuteCandidateAttemptAsync(sub, $"{ViewModel.SelectedCalibrationSymbol} ({candidate.Name})");
+    }
+
+    private void MarkCalibrationConfirmed_Click(object sender, RoutedEventArgs e)
+    {
+        string obs = ViewModel.CalibrationObservedResult;
+        string expected = ViewModel.SelectedCalibrationSymbol;
+        string msg = string.Equals(obs, expected, StringComparison.Ordinal)
+            ? $"Validado: Caractere '{expected}' conferido com sucesso no console da VM."
+            : $"Marcado como Validado manualmente (Esperado: '{expected}', Informado: '{obs}').";
+        ViewModel.SetCalibrationFeedback(DeliverySemanticState.Confirmed, msg);
+        _log.Info($"Calibração: {msg}");
+    }
+
+    private void MarkCalibrationFailed_Click(object sender, RoutedEventArgs e)
+    {
+        string obs = ViewModel.CalibrationObservedResult;
+        string expected = ViewModel.SelectedCalibrationSymbol;
+        string msg = $"Incorreto: Esperado '{expected}', mas apareceu '{obs}' na VM.";
+        ViewModel.SetCalibrationFeedback(DeliverySemanticState.Failed, msg);
+        _log.Warn($"Calibração: {msg}");
+    }
+
+    private void MarkCalibrationUnconfirmed_Click(object sender, RoutedEventArgs e)
+    {
+        string expected = ViewModel.SelectedCalibrationSymbol;
+        string msg = $"Tentativa para '{expected}' não confirmada pelo operador.";
+        ViewModel.SetCalibrationFeedback(DeliverySemanticState.Unknown, msg);
+        _log.Info($"Calibração: {msg}");
+    }
+
+    private void SaveApprovedCalibration_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedCandidate is null)
+        {
+            System.Windows.MessageBox.Show(this, "Selecione um candidato antes de salvar.", "Calibração", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var currentSettings = App.SettingsServiceInstance.Load();
+            var updated = ViewModel.ApplyApprovedCalibration(currentSettings);
+            App.SettingsServiceInstance.Save(updated);
+
+            string msg = $"Mapeamento para '{ViewModel.SelectedCalibrationSymbol}' salvo com sucesso no perfil da VM!";
+            _log.Info($"Calibração salva: '{ViewModel.SelectedCalibrationSymbol}' -> {ViewModel.SelectedCandidate.Name}");
+            System.Windows.MessageBox.Show(this, msg, "Calibração Salva", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            string err = $"Erro ao salvar calibração no perfil: {ex.Message}";
+            _log.Error(err);
+            System.Windows.MessageBox.Show(this, err, "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 }

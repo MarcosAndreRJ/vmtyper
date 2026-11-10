@@ -131,6 +131,10 @@ public static class SettingsMapper
             {
                 errors.Add($"Substituição na linha #{i + 1} ('{sub.From}'): o modo Combinação exige capturar uma tecla.");
             }
+            else if (sub.Mode == SubstitutionMode.Sequencia && (sub.SequenceSteps == null || sub.SequenceSteps.Count == 0))
+            {
+                errors.Add($"Substituição na linha #{i + 1} ('{sub.From}'): o modo Sequência exige pelo menos um passo.");
+            }
             activeSubs.Add(CloneSubstitution(sub));
         }
 
@@ -209,6 +213,20 @@ public static class SettingsMapper
         VirtualKey = h.VirtualKey
     };
 
+    public static KeySequenceStep CloneSequenceStep(KeySequenceStep step) => new()
+    {
+        VirtualKey = step.VirtualKey,
+        ScanCode = step.ScanCode,
+        Extended = step.Extended,
+        Shift = step.Shift,
+        Ctrl = step.Ctrl,
+        Alt = step.Alt,
+        AltGr = step.AltGr,
+        Action = step.Action,
+        DelayMs = step.DelayMs,
+        Label = step.Label
+    };
+
     public static CharacterSubstitution CloneSubstitution(CharacterSubstitution sub) => new()
     {
         From = sub.From,
@@ -218,7 +236,8 @@ public static class SettingsMapper
         ComboCtrl = sub.ComboCtrl,
         ComboAlt = sub.ComboAlt,
         ComboVirtualKey = sub.ComboVirtualKey,
-        ComboLabel = sub.ComboLabel
+        ComboLabel = sub.ComboLabel,
+        SequenceSteps = sub.SequenceSteps?.Select(CloneSequenceStep).ToList() ?? new()
     };
 
     public static AppSettings CloneSettings(AppSettings s) => new()

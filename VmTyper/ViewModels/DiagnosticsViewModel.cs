@@ -41,6 +41,11 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public ObservableCollection<DivergenceItem> ComparisonItems { get; } = new();
     public ObservableCollection<BenchmarkEntryRow> BenchmarkRows { get; } = new();
 
+    public DiagnosticsViewModel()
+    {
+        InitializeCalibration();
+    }
+
     private string _sessionHeaderSummary = "Nenhuma sessão JSONL carregada.";
     public string SessionHeaderSummary
     {
@@ -298,6 +303,137 @@ public sealed class DiagnosticsViewModel : ObservableObject
             }
             catch { }
         }
+    }
+
+    // ===============================================================
+    // Calibração VM (Barra e Acentuação — §Tarefas 1, 3 e 4)
+    // ===============================================================
+
+    public IReadOnlyList<string> AvailableSymbols => VmSlashAndAccentCandidates.RecommendedSymbols;
+
+    public ObservableCollection<CandidateOption> AvailableCandidates { get; } = new();
+    public ObservableCollection<KeySequenceStep> CalibrationSequenceSteps { get; } = new();
+
+    private string _selectedCalibrationSymbol = "/";
+    public string SelectedCalibrationSymbol
+    {
+        get => _selectedCalibrationSymbol;
+        set
+        {
+            if (SetField(ref _selectedCalibrationSymbol, value))
+            {
+                UpdateCandidatesForSymbol(value);
+            }
+        }
+    }
+
+    private CandidateOption? _selectedCandidate;
+    public CandidateOption? SelectedCandidate
+    {
+        get => _selectedCandidate;
+        set
+        {
+            if (SetField(ref _selectedCandidate, value))
+            {
+                UpdateStepsForCandidate(value);
+            }
+        }
+    }
+
+    private string _calibrationObservedResult = string.Empty;
+    public string CalibrationObservedResult
+    {
+        get => _calibrationObservedResult;
+        set => SetField(ref _calibrationObservedResult, value);
+    }
+
+    private string _calibrationStatusMessage = "Selecione o caractere e o candidato físico, envie para a VM e informe o resultado.";
+    public string CalibrationStatusMessage
+    {
+        get => _calibrationStatusMessage;
+        set => SetField(ref _calibrationStatusMessage, value);
+    }
+
+    private DeliveryVisualBadge _calibrationDeliveryBadge = DeliverySemantics.GetBadge(DeliverySemanticState.Unknown);
+    public DeliveryVisualBadge CalibrationDeliveryBadge
+    {
+        get => _calibrationDeliveryBadge;
+        set => SetField(ref _calibrationDeliveryBadge, value);
+    }
+
+    public void InitializeCalibration()
+    {
+        UpdateCandidatesForSymbol(SelectedCalibrationSymbol);
+    }
+
+    public void UpdateCandidatesForSymbol(string symbol)
+    {
+        AvailableCandidates.Clear();
+        var list = VmSlashAndAccentCandidates.GetCandidatesForSymbol(symbol);
+        foreach (var c in list)
+        {
+            AvailableCandidates.Add(c);
+        }
+        SelectedCandidate = AvailableCandidates.FirstOrDefault();
+        CalibrationDeliveryBadge = DeliverySemantics.GetBadge(DeliverySemanticState.Unknown);
+        CalibrationObservedResult = string.Empty;
+        CalibrationStatusMessage = $"Caractere '{symbol}': {AvailableCandidates.Count} candidato(s) carregado(s).";
+    }
+
+    private void UpdateStepsForCandidate(CandidateOption? candidate)
+    {
+        CalibrationSequenceSteps.Clear();
+        if (candidate is null) return;
+
+        if (candidate.SubstitutionTemplate.Mode == SubstitutionMode.Sequencia &&
+            candidate.SubstitutionTemplate.SequenceSteps != null)
+        {
+            foreach (var step in candidate.SubstitutionTemplate.SequenceSteps)
+            {
+                CalibrationSequenceSteps.Add(step);
+            }
+        }
+        else if (candidate.SubstitutionTemplate.Mode == SubstitutionMode.Combinacao)
+        {
+            CalibrationSequenceSteps.Add(new KeySequenceStep
+            {
+                VirtualKey = (ushort)candidate.SubstitutionTemplate.ComboVirtualKey,
+                Shift = candidate.SubstitutionTemplate.ComboShift,
+                Ctrl = candidate.SubstitutionTemplate.ComboCtrl,
+                Alt = candidate.SubstitutionTemplate.ComboAlt,
+                Action = KeySequenceAction.Press,
+                Label = candidate.SubstitutionTemplate.ComboLabel
+            });
+        }
+    }
+
+    public void SetCalibrationFeedback(DeliverySemanticState state, string feedbackDetails)
+    {
+        CalibrationDeliveryBadge = DeliverySemantics.GetBadge(state);
+        CalibrationStatusMessage = feedbackDetails;
+    }
+
+    public AppSettings ApplyApprovedCalibration(AppSettings currentSettings)
+    {
+        if (SelectedCandidate is null) return currentSettings;
+
+        var template = SelectedCandidate.SubstitutionTemplate;
+        var ruleToSave = SettingsMapper.CloneSubstitution(template);
+        ruleToSave.From = SelectedCalibrationSymbol;
+
+        var list = new List<CharacterSubstitution>(currentSettings.CharacterSubstitutions);
+        int existingIdx = list.FindIndex(s => string.Equals(s.From, SelectedCalibrationSymbol, StringComparison.Ordinal));
+        if (existingIdx >= 0)
+        {
+            list[existingIdx] = ruleToSave;
+        }
+        else
+        {
+            list.Add(ruleToSave);
+        }
+
+        currentSettings.CharacterSubstitutions = list;
+        return currentSettings;
     }
 
     private static string FindDefaultF3DataDir()

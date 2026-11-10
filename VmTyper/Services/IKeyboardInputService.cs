@@ -19,4 +19,6 @@ public interface IKeyboardInputService
         IProgress<TypingProgress>? progress,
         PauseToken pauseToken,
         CancellationToken cancellationToken);
+
+    void FlushDeadKeyState() { }
 }

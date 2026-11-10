@@ -24,14 +24,16 @@ public enum UnitKind
     Tab,
     Combo,
     IndentationReset,
-    Unsupported
+    Unsupported,
+    PhysicalSequence
 }
 
 public readonly record struct KeyEvent(
     KeyEventKind Kind,
     KeyEncoding Enc,
     ushort Code,
-    bool Extended);
+    bool Extended,
+    int DelayAfterMs = 0);
 
 public sealed record InputUnit(
     int Index,
@@ -71,6 +73,8 @@ public sealed record PreflightReport(
 /// </summary>
 public sealed class KeyStrokePlanner
 {
+    public const int DefaultDeadKeyInterKeyDelayMs = 15;
+
     private readonly KeyboardMappingService _mapping;
 
     public KeyStrokePlanner(KeyboardMappingService mapping)
@@ -119,10 +123,17 @@ public sealed class KeyStrokePlanner
 
         foreach (var token in tokens)
         {
-            if (token.ComboRule is { } comboSub)
+            if (token.ComboRule is { } subRule)
             {
+                if (subRule.Mode == SubstitutionMode.Sequencia)
+                {
+                    var seqEvents = BuildPhysicalSequenceEvents(subRule.SequenceSteps, options.Layout);
+                    units.Add(new InputUnit(unitIndex++, token.OriginalText, UnitKind.PhysicalSequence, seqEvents));
+                    continue;
+                }
+
                 var comboEvents = BuildKeyComboEvents(
-                    new KeyCombo((ushort)comboSub.ComboVirtualKey, comboSub.ComboShift, comboSub.ComboCtrl, comboSub.ComboAlt),
+                    new KeyCombo((ushort)subRule.ComboVirtualKey, subRule.ComboShift, subRule.ComboCtrl, subRule.ComboAlt),
                     options.Layout);
                 units.Add(new InputUnit(unitIndex++, token.OriginalText, UnitKind.Combo, comboEvents));
                 continue;
@@ -213,7 +224,7 @@ public sealed class KeyStrokePlanner
             if (matched is { } m)
             {
                 appliedRules.Add(m.ruleNumber);
-                if (m.sub.Mode == SubstitutionMode.Combinacao)
+                if (m.sub.Mode is SubstitutionMode.Combinacao or SubstitutionMode.Sequencia)
                 {
                     result.Add(new PlannedToken(m.sub.From, string.Empty, m.sub));
                 }
@@ -248,9 +259,19 @@ public sealed class KeyStrokePlanner
             if (mapping.Success)
             {
                 var events = new List<KeyEvent>();
-                foreach (var combo in mapping.Combos)
+                for (int comboIdx = 0; comboIdx < mapping.Combos.Count; comboIdx++)
                 {
-                    events.AddRange(BuildKeyComboEvents(combo, options.Layout));
+                    var combo = mapping.Combos[comboIdx];
+                    var comboEvents = BuildKeyComboEvents(combo, options.Layout);
+                    // Se este combo é uma tecla morta que precede outro combo (letra base),
+                    // insere o intervalo inter-teclas no KeyUp para o console e o SO processarem a tecla morta.
+                    if (comboIdx < mapping.Combos.Count - 1 && comboEvents.Count > 0)
+                    {
+                        int lastIdx = comboEvents.Count - 1;
+                        var last = comboEvents[lastIdx];
+                        comboEvents[lastIdx] = last with { DelayAfterMs = Math.Max(last.DelayAfterMs, DefaultDeadKeyInterKeyDelayMs) };
+                    }
+                    events.AddRange(comboEvents);
                 }
                 return new InputUnit(index, grapheme, UnitKind.Physical, events);
             }
@@ -331,6 +352,85 @@ public sealed class KeyStrokePlanner
         all.AddRange(downs);
         all.AddRange(ups);
         return all;
+    }
+
+    private List<KeyEvent> BuildPhysicalSequenceEvents(IReadOnlyList<KeySequenceStep> steps, IntPtr layout)
+    {
+        var events = new List<KeyEvent>();
+        if (steps == null || steps.Count == 0) return events;
+
+        foreach (var step in steps)
+        {
+            ushort scan = step.ScanCode;
+            bool ext = step.Extended;
+            if (scan == 0 && step.VirtualKey > 0)
+            {
+                var (resolvedScan, resolvedExt) = _mapping.ResolveScan(step.VirtualKey, layout);
+                scan = resolvedScan;
+                ext = step.Extended || resolvedExt;
+            }
+
+            var mods = new List<(ushort scan, bool ext)>();
+            if (step.Shift)
+            {
+                var (ms, me) = _mapping.ResolveScan(Win32.VK_LSHIFT, layout);
+                mods.Add((ms, me));
+            }
+            if (step.AltGr)
+            {
+                var (cs, ce) = _mapping.ResolveScan(Win32.VK_LCONTROL, layout);
+                var (as_, ae) = _mapping.ResolveScan(Win32.VK_RMENU, layout);
+                mods.Add((cs, ce));
+                mods.Add((as_, ae));
+            }
+            else
+            {
+                if (step.Ctrl)
+                {
+                    var (cs, ce) = _mapping.ResolveScan(Win32.VK_LCONTROL, layout);
+                    mods.Add((cs, ce));
+                }
+                if (step.Alt)
+                {
+                    var (as_, ae) = _mapping.ResolveScan(Win32.VK_LMENU, layout);
+                    mods.Add((as_, ae));
+                }
+            }
+
+            switch (step.Action)
+            {
+                case KeySequenceAction.Press:
+                    foreach (var (ms, me) in mods)
+                    {
+                        events.Add(new KeyEvent(KeyEventKind.Down, KeyEncoding.Scan, ms, me));
+                    }
+                    events.Add(new KeyEvent(KeyEventKind.Down, KeyEncoding.Scan, scan, ext));
+                    events.Add(new KeyEvent(KeyEventKind.Up, KeyEncoding.Scan, scan, ext, DelayAfterMs: step.DelayMs));
+                    for (int mIdx = mods.Count - 1; mIdx >= 0; mIdx--)
+                    {
+                        events.Add(new KeyEvent(KeyEventKind.Up, KeyEncoding.Scan, mods[mIdx].scan, mods[mIdx].ext));
+                    }
+                    break;
+
+                case KeySequenceAction.KeyDown:
+                    foreach (var (ms, me) in mods)
+                    {
+                        events.Add(new KeyEvent(KeyEventKind.Down, KeyEncoding.Scan, ms, me));
+                    }
+                    events.Add(new KeyEvent(KeyEventKind.Down, KeyEncoding.Scan, scan, ext, DelayAfterMs: step.DelayMs));
+                    break;
+
+                case KeySequenceAction.KeyUp:
+                    events.Add(new KeyEvent(KeyEventKind.Up, KeyEncoding.Scan, scan, ext, DelayAfterMs: step.DelayMs));
+                    for (int mIdx = mods.Count - 1; mIdx >= 0; mIdx--)
+                    {
+                        events.Add(new KeyEvent(KeyEventKind.Up, KeyEncoding.Scan, mods[mIdx].scan, mods[mIdx].ext));
+                    }
+                    break;
+            }
+        }
+
+        return events;
     }
 
     /// <summary>

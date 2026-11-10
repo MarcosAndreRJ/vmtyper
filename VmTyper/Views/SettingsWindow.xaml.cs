@@ -192,6 +192,35 @@ public partial class SettingsWindow : Window
         item.ComboLabel = "Pressione a combinação desejada...";
     }
 
+    private void OpenCalibrationForSubstitution_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CharacterSubstitution item }) return;
+
+        var diag = new DiagnosticsWindow(App.TypingServiceInstance, App.LogServiceInstance, App.CoordinatorInstance)
+        {
+            Owner = this
+        };
+        if (!string.IsNullOrWhiteSpace(item.From))
+        {
+            diag.ViewModel.SelectedCalibrationSymbol = item.From;
+        }
+        diag.ShowDialog();
+
+        // Recarrega as configurações salvas pela janela de calibração caso tenham mudado
+        var reloaded = App.SettingsServiceInstance.Load();
+        var match = reloaded.CharacterSubstitutions.FirstOrDefault(s => string.Equals(s.From, item.From, StringComparison.Ordinal));
+        if (match is not null)
+        {
+            item.Mode = match.Mode;
+            item.SequenceSteps = match.SequenceSteps?.Select(SettingsMapper.CloneSequenceStep).ToList() ?? new();
+            item.ComboLabel = match.ComboLabel;
+            item.ComboVirtualKey = match.ComboVirtualKey;
+            item.ComboShift = match.ComboShift;
+            item.ComboCtrl = match.ComboCtrl;
+            item.ComboAlt = match.ComboAlt;
+        }
+    }
+
     private void OpenPersistenceFolder_Click(object sender, RoutedEventArgs e)
     {
         try

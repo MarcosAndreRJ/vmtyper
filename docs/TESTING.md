@@ -87,3 +87,37 @@ Quando novos ambientes VMware ou consoles HTML5 forem atualizados, execute o seg
    - Verifique se houve caracteres duplicados ou omitidos.
    - Caso haja falhas, registre o log técnico gerado na pasta de logs (`%AppData%\VmTyper\logs\`).
 
+---
+
+## 5. Protocolo de Calibração Manual no Console VMware HTML5 (Barra e Acentuação)
+
+### 5.1 Contexto e Desafio Técnico
+No console VMware HTML5 (vSphere / ESXi Web Client), os eventos de teclado são capturados via JavaScript no canvas do navegador e transmitidos via WebSocket para o hypervisor.
+Diferente de conexões RDP ou VMRC nativas:
+1. O controlador virtualizado do ESXi normalmente emula um teclado US de 101/104 teclas.
+2. A tecla física de barra/interrogação do layout ABNT2 (`VK_ABNT_C1`, Scan code `0x73`, browser `code: "IntlRo"`) é frequentemente descartada ou não traduzida pelo console HTML5.
+3. Teclas mortas de acentuação (`´`, `~`, `^`, `` ` ``) enviadas sem intervalo pós-soltura (*inter-key delay*) colidem no buffer de eventos do navegador, impedindo a composição correta no sistema operacional convidado.
+
+### 5.2 Roteiro de Calibração da Barra (`/`) e Interrogação (`?`)
+1. No VmTyper, abra **Diagnóstico → Aba "Calibração VM (Barra e Acentos)"**.
+2. Deixe o console VMware HTML5 visível e com o cursor posicionado em um editor ou terminal da VM.
+3. Na seção **"Diagnóstico Rápido da Barra ('/')"**, clique em cada um dos testes individuais:
+   - **1. Numpad Divide (E0 35):** envia o scan code `0x35` estendido (teclado numérico).
+   - **2. Tecla ABNT2 (Scan 0x73):** envia o scan code `0x73` físico da tecla ao lado do Shift direito.
+   - **3. Tecla US (Scan 0x35):** envia o scan code `0x35` não-estendido (barra do layout US de 104 teclas).
+   - **4. AltGr + Q:** envia `Ctrl + Alt + Q` (mapeamento secundário em layouts que mapeiam a barra em Q).
+   - **5. Alt + 47 (Numpad):** envia a sequência de código de caractere ASCII universal via Alt numpad.
+4. Após o disparo de cada teste (com a contagem de 3 segundos para focar no console), anote qual dos candidatos produziu exatamente a barra `/` na tela da VM.
+5. Selecione o candidato aprovado no ComboBox **"Candidato físico"** e clique em **"Validado com Sucesso"**.
+6. Clique no botão verde **"Salvar Mapeamento Aprovado no Perfil da VM"**. O VmTyper salvará essa regra física em `AppSettings.CharacterSubstitutions`, preservando todas as outras regras existentes.
+
+### 5.3 Roteiro de Calibração de Acentuação (`á, ã, é, ê, í, ó, ô, õ, ú` e maiúsculas)
+1. No ComboBox **"Caractere alvo"**, selecione o caractere desejado (ex.: `á`, `ã`, `é`).
+2. O VmTyper carrega automaticamente os candidatos pré-definidos:
+   - **Candidato 1 (Padrão com intervalo):** Sequência física da tecla morta (ex.: Agudo no scan `0x1A` ou Til no scan `0x28`) com pausa programada de 15ms após a soltura, seguida da descida e subida da letra base.
+   - **Candidato 2 (US-International):** Apóstrofo (scan `0x28`) ou Shift+~ (scan `0x29`) com pausa de 15ms + letra base.
+   - **Candidato 3 (Alt Numpad):** Sequência física de Alt Down + dígitos numéricos + Alt Up.
+3. Clique em **"Testar Candidato na VM (3s)"** e focalize a área de texto do console VMware.
+4. Se o caractere acentuado compuser perfeitamente (ex.: `á` em vez de `´a` ou `a`), marque **"Validado com Sucesso"** e clique em **"Salvar Mapeamento Aprovado no Perfil da VM"**.
+5. Se por qualquer motivo uma tecla morta ficar pendente na VM (ex.: teste interrompido), clique no botão **"Limpar Teclas Mortas (Flush)"** para enviar a sequência corretiva `Space + Backspace`.
+

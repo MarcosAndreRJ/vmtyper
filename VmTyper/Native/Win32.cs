@@ -101,11 +101,25 @@ internal static class Win32
     public const ushort VK_RETURN = 0x0D;
     public const ushort VK_TAB = 0x09;
     public const ushort VK_ESCAPE = 0x1B;
+    public const ushort VK_BACK = 0x08;
     public const ushort VK_SHIFT = 0x10;
     public const ushort VK_CONTROL = 0x11;
     public const ushort VK_MENU = 0x12;
     public const ushort VK_HOME = 0x24;
     public const ushort VK_DELETE = 0x2E;
+    public const ushort VK_OEM_2 = 0xBF;      // /? no teclado US
+    public const ushort VK_ABNT_C1 = 0xC1;    // /? no teclado ABNT2 (próxima ao Shift direito)
+    public const ushort VK_ABNT_C2 = 0xC2;    // Ponto/vírgula numérico no teclado ABNT2
+    public const ushort VK_NUMPAD0 = 0x60;
+    public const ushort VK_NUMPAD1 = 0x61;
+    public const ushort VK_NUMPAD2 = 0x62;
+    public const ushort VK_NUMPAD3 = 0x63;
+    public const ushort VK_NUMPAD4 = 0x64;
+    public const ushort VK_NUMPAD5 = 0x65;
+    public const ushort VK_NUMPAD6 = 0x66;
+    public const ushort VK_NUMPAD7 = 0x67;
+    public const ushort VK_NUMPAD8 = 0x68;
+    public const ushort VK_NUMPAD9 = 0x69;
 
     /// <summary>
     /// Tabela de fallback das teclas que o Windows trata como "estendidas" e

@@ -242,8 +242,10 @@
                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                 <RadioButton Content="Texto" Margin="0,0,16,0" VerticalAlignment="Center"
                                                              IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Texto}"/>
-                                                <RadioButton Content="Combinação de teclas" VerticalAlignment="Center"
+                                                <RadioButton Content="Combinação de teclas" Margin="0,0,16,0" VerticalAlignment="Center"
                                                              IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Combinacao}"/>
+                                                <RadioButton Content="Sequência física" VerticalAlignment="Center"
+                                                             IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Sequencia}"/>
                                             </StackPanel>
 
                                             <Grid Margin="0,6,0,0"
@@ -267,6 +269,18 @@
                                                          Background="#EEEEEE" FontFamily="Consolas"/>
                                                 <Button Grid.Column="1" Content="Capturar" Margin="6,0,0,0" Tag="{Binding}" Click="CaptureSubstitutionCombo_Click"
                                                         AutomationProperties.Name="Capturar combinação de teclas"/>
+                                            </Grid>
+
+                                            <Grid Margin="0,6,0,0"
+                                                  Visibility="{Binding Mode, Converter={x:Static helpers:EnumToVisibilityConverter.Instance}, ConverterParameter=Sequencia}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Text="{Binding SequenceSummary, Mode=OneWay}" IsReadOnly="True"
+                                                         Background="#EEEEEE" FontFamily="Consolas"/>
+                                                <Button Grid.Column="1" Content="Calibrar na VM..." Margin="6,0,0,0" Tag="{Binding}" Click="OpenCalibrationForSubstitution_Click"
+                                                        AutomationProperties.Name="Calibrar sequência no painel de diagnóstico"/>
                                             </Grid>
                                         </StackPanel>
                                     </Border>
