@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using VmTyper.Documents;
 using VmTyper.Helpers;
 using VmTyper.Models;
 using VmTyper.Resources;
@@ -37,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly HistoryService _historyService;
     private readonly IHotkeyRegistrar _hotkeyService;
     private readonly TypingQueueService _queueService;
+    private readonly DocumentManager _docManager;
     private readonly LogService _log;
     private readonly TypingSessionCoordinator _coordinator;
     private readonly TargetGuard _targetGuard;
@@ -270,14 +272,49 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public DocumentManager DocManager => _docManager;
+
+    private bool _isSmartEditorMode = false;
+    public bool IsSmartEditorMode
+    {
+        get => _isSmartEditorMode;
+        set
+        {
+            if (SetField(ref _isSmartEditorMode, value))
+            {
+                OnPropertyChanged(nameof(IsSimpleQueueMode));
+                OnPropertyChanged(nameof(HasNextBlock));
+                OnPropertyChanged(nameof(CanStart));
+                OnPropertyChanged(nameof(NextBlockLabel));
+                OnPropertyChanged(nameof(DigitarButtonText));
+                OnPropertyChanged(nameof(DigitarButtonWithShortcut));
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
+    public bool IsSimpleQueueMode => !IsSmartEditorMode;
+
     // --- Fila ---
-    public bool HasNextBlock => _queueService.Current is not null;
+    public bool HasNextBlock => IsSmartEditorMode
+        ? (_docManager.SelectedBlock != null && _docManager.CurrentDocument != null && !string.IsNullOrEmpty(_docManager.SelectedBlock.GetText(_docManager.CurrentDocument.Text)))
+        : (_queueService.Current is not null);
+
     public bool CanStart => !IsBusy && HasNextBlock;
 
     public string NextBlockLabel
     {
         get
         {
+            if (IsSmartEditorMode)
+            {
+                if (_docManager.SelectedBlock is { } sb && _docManager.CurrentDocument is { } doc)
+                {
+                    return $"Bloco Ativo: {sb.Title} ({sb.LineRangeDisplay})";
+                }
+                return _docManager.HasDocument ? "Nenhum bloco selecionado." : "Nenhum documento aberto.";
+            }
+
             var current = _queueService.Current;
             if (current is not null) return $"Próximo: Bloco {current.Order} de {_queueService.TotalBlocks}";
             return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent)
@@ -290,6 +327,16 @@ public sealed class MainViewModel : ObservableObject
     {
         get
         {
+            if (IsSmartEditorMode)
+            {
+                if (_docManager.SelectedBlock is { } sb)
+                {
+                    string shortTitle = sb.Title.Length > 20 ? sb.Title[..20] + "…" : sb.Title;
+                    return $"DIGITAR: {shortTitle.ToUpperInvariant()}";
+                }
+                return "DIGITAR BLOCO";
+            }
+
             var current = _queueService.Current;
             if (current is not null) return $"DIGITAR BLOCO {current.Order}";
             return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent) ? "FILA ENVIADA" : "DIGITAR";
@@ -372,12 +419,17 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public ICommand StartCommand { get; }
+    public ICommand StartDocumentCommand { get; }
+    public ICommand StartSelectionCommand { get; }
     public ICommand PauseResumeCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand ClearHistoryCommand { get; }
     public ICommand MoveUpCommand { get; }
     public ICommand MoveDownCommand { get; }
     public ICommand SetAsNextCommand { get; }
+    public ICommand SplitAtCaretCommand { get; }
+    public ICommand ReSplitCommand { get; }
+    public ICommand MergeNextBlockCommand { get; }
 
     public MainViewModel(
         IKeyboardInputService typingService,
@@ -389,7 +441,8 @@ public sealed class MainViewModel : ObservableObject
         LogService log,
         TypingSessionCoordinator? coordinator = null,
         Func<int, CancellationToken, Task>? delayAsync = null,
-        TargetGuard? targetGuard = null)
+        TargetGuard? targetGuard = null,
+        DocumentManager? docManager = null)
     {
         _typingService = typingService;
         _activeWindowService = activeWindowService;
@@ -397,6 +450,7 @@ public sealed class MainViewModel : ObservableObject
         _historyService = historyService;
         _hotkeyService = hotkeyService;
         _queueService = queueService;
+        _docManager = docManager ?? new DocumentManager();
         _log = log;
         _coordinator = coordinator ?? new TypingSessionCoordinator(hotkeyService, log);
         _delayAsync = delayAsync ?? Task.Delay;
@@ -408,6 +462,14 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(IsBusy));
             OnPropertyChanged(nameof(CanEditQueue));
             CommandManager.InvalidateRequerySuggested();
+        };
+
+        _docManager.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName is nameof(DocumentManager.SelectedBlock) or nameof(DocumentManager.CurrentDocument))
+            {
+                OnQueueChanged();
+            }
         };
 
         LogLines = log.Lines;
@@ -463,6 +525,8 @@ public sealed class MainViewModel : ObservableObject
         };
 
         StartCommand = new RelayCommand(async () => await StartAsync(), () => !IsBusy && HasNextBlock);
+        StartDocumentCommand = new RelayCommand(async () => await StartDocumentAsync(), () => !IsBusy && _docManager.HasDocument && !string.IsNullOrEmpty(_docManager.CurrentDocument?.Text));
+        StartSelectionCommand = new RelayCommand(async p => await StartSelectionAsync(p as string), p => !IsBusy && !string.IsNullOrEmpty(p as string));
         PauseResumeCommand = new RelayCommand(TogglePause, () => CanPause);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
         ClearHistoryCommand = new RelayCommand(() => { History.Clear(); _historyService.Save(History); });
@@ -470,6 +534,27 @@ public sealed class MainViewModel : ObservableObject
         MoveUpCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveUp(b.Id); }, p => CanEditQueue);
         MoveDownCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.MoveDown(b.Id); }, p => CanEditQueue);
         SetAsNextCommand = new RelayCommand(p => { if (p is TextBlockItem b) _queueService.SetAsNext(b.Id); }, p => CanEditQueue);
+
+        SplitAtCaretCommand = new RelayCommand(p =>
+        {
+            if (p is int caretOffset)
+            {
+                _docManager.SplitCurrentBlockAtCaret(caretOffset);
+            }
+        }, _ => CanEditQueue && _docManager.SelectedBlock != null);
+
+        ReSplitCommand = new RelayCommand(() => _docManager.ReSplitCurrentDocument(), () => CanEditQueue && _docManager.HasDocument);
+        MergeNextBlockCommand = new RelayCommand(p =>
+        {
+            if (p is CodeBlock b)
+            {
+                _docManager.MergeBlockWithNext(b);
+            }
+            else if (_docManager.SelectedBlock is { } sb)
+            {
+                _docManager.MergeBlockWithNext(sb);
+            }
+        }, _ => CanEditQueue && _docManager.SelectedBlock != null);
 
         RegisterPermanentHotkeys();
     }
@@ -537,13 +622,269 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Digita exclusivamente o próximo bloco elegível da fila (1 acionamento
-    /// = 1 bloco). Chamado tanto pelo botão DIGITAR quanto pelo hotkey
-    /// global. O <see cref="TypingSessionCoordinator"/> garante exclusividade
-    /// por processo (entre a janela principal e a de diagnóstico) e é o único
-    /// responsável por registrar/desregistrar o ESC global.
+    /// Inicia a digitação de acordo com o modo ativo:
+    /// Se no modo Smart Editor, digita o bloco inteligente selecionado.
+    /// Se no modo Simple Queue, digita o próximo bloco da fila.
     /// </summary>
     public async Task StartAsync()
+    {
+        if (IsSmartEditorMode)
+        {
+            await StartSmartBlockAsync().ConfigureAwait(true);
+        }
+        else
+        {
+            await StartQueueBlockAsync().ConfigureAwait(true);
+        }
+    }
+
+    public async Task StartDocumentAsync()
+    {
+        if (_docManager.CurrentDocument is not { } doc || string.IsNullOrEmpty(doc.Text))
+        {
+            StatusMessage = "Nenhum documento aberto com conteúdo.";
+            return;
+        }
+
+        using var lease = _coordinator.TryBegin("Main");
+        if (lease is null)
+        {
+            _log.Info("Acionamento ignorado: já existe uma digitação em andamento.");
+            return;
+        }
+
+        _activeLease = lease;
+        try
+        {
+            await TypeTextPayloadAsync(doc.Text, $"Documento completo '{doc.Name}'", lease).ConfigureAwait(true);
+        }
+        finally
+        {
+            _activeLease = null;
+        }
+    }
+
+    public async Task StartSelectionAsync(string? selectedText)
+    {
+        if (string.IsNullOrEmpty(selectedText))
+        {
+            StatusMessage = "Nenhum texto selecionado no editor.";
+            return;
+        }
+
+        using var lease = _coordinator.TryBegin("Main");
+        if (lease is null)
+        {
+            _log.Info("Acionamento ignorado: já existe uma digitação em andamento.");
+            return;
+        }
+
+        _activeLease = lease;
+        try
+        {
+            await TypeTextPayloadAsync(selectedText, "Seleção do editor", lease).ConfigureAwait(true);
+        }
+        finally
+        {
+            _activeLease = null;
+        }
+    }
+
+    public async Task StartSmartBlockAsync()
+    {
+        if (_docManager.SelectedBlock is not { } block || _docManager.CurrentDocument is not { } doc)
+        {
+            StatusMessage = "Selecione um bloco inteligente para digitar.";
+            return;
+        }
+
+        string textToType = block.GetText(doc.Text);
+        if (string.IsNullOrEmpty(textToType))
+        {
+            StatusMessage = "O bloco inteligente selecionado está vazio.";
+            return;
+        }
+
+        using var lease = _coordinator.TryBegin("Main");
+        if (lease is null)
+        {
+            _log.Info("Acionamento ignorado: já existe uma digitação em andamento.");
+            return;
+        }
+
+        _activeLease = lease;
+        block.Status = TextBlockStatus.Typing;
+        try
+        {
+            bool ok = await TypeTextPayloadAsync(textToType, $"Bloco Inteligente: {block.Title} ({block.LineRangeDisplay})", lease).ConfigureAwait(true);
+            block.Status = ok ? TextBlockStatus.Sent : TextBlockStatus.Failed;
+        }
+        catch
+        {
+            block.Status = TextBlockStatus.Failed;
+            throw;
+        }
+        finally
+        {
+            _activeLease = null;
+        }
+    }
+
+    private async Task<bool> TypeTextPayloadAsync(string textToType, string description, TypingSessionLease lease)
+    {
+        Guid sessionId = lease.SessionId;
+        var token = lease.Token;
+
+        State = TypingState.AguardandoContagem;
+        _sessionStartedAt = DateTime.Now;
+        TotalCharacters = textToType.Length;
+        TypedCharacters = 0;
+
+        _log.Info($"Sessão iniciada: {description}");
+        _log.Info($"Método: {Settings.Method}");
+        _log.Info($"Caracteres: {textToType.Length}");
+
+        try
+        {
+            int seconds = Math.Max(0, Settings.CountdownSeconds);
+            for (int i = seconds; i > 0; i--)
+            {
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token).ConfigureAwait(true);
+                CountdownText = $"Iniciando em {i}...";
+                StatusMessage = $"{description}: clique no destino (janela do navegador / VM) agora.";
+                await _delayAsync(1000, token).ConfigureAwait(true);
+                await lease.Pause.WaitWhilePausedAsync().WaitAsync(token).ConfigureAwait(true);
+            }
+            CountdownText = string.Empty;
+
+            if (Settings.EnableTargetGuard || Settings.ValidateTargetWindow)
+            {
+                var anchorResult = _targetGuard.TryCaptureAnchor(Settings.ValidateTargetWindow, Settings.ExpectedBrowser);
+                OnPropertyChanged(nameof(TargetIndicatorText));
+                if (!anchorResult.IsValid)
+                {
+                    State = TypingState.Erro;
+                    StatusSeverity = "Error";
+                    LastDeliverySemanticState = DeliverySemanticState.Failed;
+                    StatusMessage = anchorResult.ErrorMessage ?? "A janela ativa não é um destino válido.";
+                    _log.Warn(StatusMessage);
+                    return false;
+                }
+            }
+
+            var resolvedProfile = TypingProfile.Resolve(Settings);
+            var baseOptions = new TypingOptions
+            {
+                CharDelayMs = Settings.CharDelayMs,
+                EnterDelayMs = Settings.EnterDelayMs,
+                Method = Settings.Method,
+                TargetLayout = Settings.TargetLayout,
+                PreserveOriginalIndentation = Settings.PreserveOriginalIndentation,
+                IndentationStrategy = IndentationResetStrategy.Auto,
+                Substitutions = Settings.CharacterSubstitutions,
+                Profile = resolvedProfile
+            };
+
+            var preflight = _typingService.Plan(textToType, baseOptions);
+            var dryRun = TypingScheduler.DryRun(preflight, resolvedProfile);
+            bool fallbackUnicode = false;
+            if (preflight.UnsupportedCount > 0)
+            {
+                var decision = ConfirmPreflightUnsupported?.Invoke(preflight) ?? PreflightDecision.Cancel;
+                if (decision == PreflightDecision.Cancel)
+                {
+                    State = TypingState.Cancelado;
+                    StatusSeverity = "Warning";
+                    StatusMessage = $"Envio cancelado no pré-voo ({preflight.UnsupportedCount} unidade(s) não suportada(s)).";
+                    _log.Info(StatusMessage);
+                    return false;
+                }
+                fallbackUnicode = decision == PreflightDecision.FallbackToUnicode;
+            }
+
+            if (preflight.TotalUnits > 0)
+            {
+                TotalCharacters = preflight.TotalUnits;
+            }
+            SkippedUnits = 0;
+            FailedUnits = 0;
+            StatusSeverity = "Normal";
+
+            State = TypingState.Digitando;
+            StatusMessage = $"Digitando {description} (estimativa: ~{dryRun.EstimatedDuration.TotalSeconds:0.0}s)...";
+
+            var options = new TypingOptions
+            {
+                CharDelayMs = baseOptions.CharDelayMs,
+                EnterDelayMs = baseOptions.EnterDelayMs,
+                Method = baseOptions.Method,
+                TargetLayout = baseOptions.TargetLayout,
+                FallbackUnsupportedToUnicode = fallbackUnicode,
+                PreserveOriginalIndentation = baseOptions.PreserveOriginalIndentation,
+                IndentationStrategy = baseOptions.IndentationStrategy,
+                Substitutions = baseOptions.Substitutions,
+                Profile = resolvedProfile,
+                BeforeUnitAsync = Settings.EnableTargetGuard
+                    ? (unitIdx, ct) => CheckTargetGuardBeforeUnitAsync(lease, unitIdx, ct)
+                    : null
+            };
+
+            var progress = new Helpers.DirectProgress<TypingProgress>(OnProgress);
+
+            _log.Info("Digitação iniciada");
+            await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token).ConfigureAwait(true);
+
+            double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
+            if (_skippedUnits > 0 || _failedUnits > 0)
+            {
+                State = TypingState.Erro;
+                StatusSeverity = _failedUnits > 0 ? "Error" : "Warning";
+                LastDeliverySemanticState = DeliverySemantics.FromLocalSendResult(UnitOutcome.Failed);
+                string warn = $"Envio concluído com ressalvas: {TypedCharacters} enviados, {_skippedUnits} pulados, {_failedUnits} falhas.";
+                StatusMessage = warn;
+                _log.Warn(warn);
+                AddHistoryEntry(sessionId, Guid.Empty, 0, TotalCharacters, completed: false, duration);
+                return false;
+            }
+            else
+            {
+                State = TypingState.Concluido;
+                StatusSeverity = "Normal";
+                bool hadFocusIncidents = _targetGuard.Incidents.Count > 0;
+                LastDeliverySemanticState = DeliverySemantics.FromLocalSendResult(UnitOutcome.Sent, hadFocusIncidents);
+                _log.Info($"Digitação concluída. Unidades enviadas: {TypedCharacters}. Duração: {duration:0.0}s");
+                AddHistoryEntry(sessionId, Guid.Empty, 0, TotalCharacters, completed: true, duration);
+                StatusMessage = $"Envio concluído ({TypedCharacters} caracteres digitados).";
+                return true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
+            State = TypingState.Cancelado;
+            StatusSeverity = "Warning";
+            StatusMessage = "Digitação cancelada pelo usuário.";
+            _log.Info("Digitação cancelada pelo usuário.");
+            AddHistoryEntry(sessionId, Guid.Empty, 0, TotalCharacters, completed: false, duration);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            State = TypingState.Erro;
+            StatusSeverity = "Error";
+            LastDeliverySemanticState = DeliverySemanticState.Failed;
+            StatusMessage = $"Erro durante digitação: {ex.Message}";
+            _log.Error(ex.Message);
+            return false;
+        }
+        finally
+        {
+            _targetGuard.StopMonitoring();
+            OnPropertyChanged(nameof(TargetIndicatorText));
+        }
+    }
+
+    public async Task StartQueueBlockAsync()
     {
         using var lease = _coordinator.TryBegin("Main");
         if (lease is null)

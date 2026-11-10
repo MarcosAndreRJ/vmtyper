@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:helpers="clr-namespace:VmTyper.Helpers"
         xmlns:models="clr-namespace:VmTyper.Models"
+        xmlns:editor="clr-namespace:VmTyper.Editor"
         Title="VmTyper — Digitação automatizada para VM via navegador"
-        Width="1060" Height="710" MinWidth="860" MinHeight="580"
+        Width="1120" Height="740" MinWidth="900" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         StateChanged="Window_StateChanged"
         Closing="Window_Closing">
@@ -107,121 +108,336 @@
                 <ColumnDefinition Width="1*" MinWidth="290"/>
             </Grid.ColumnDefinitions>
 
-            <!-- §1.2 Fila de blocos de texto -->
-            <DockPanel Grid.Column="0">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" IsEnabled="{Binding CanEditQueue}">
-                    <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"
-                            AutomationProperties.Name="Adicionar bloco"/>
-                    <Button Content="REINICIAR FILA" Click="RestartQueue_Click"
-                            AutomationProperties.Name="Reiniciar fila"/>
-                    <Button Content="NOVA FILA" Click="NewQueue_Click"
-                            AutomationProperties.Name="Nova fila"/>
-                </StackPanel>
+            <!-- Coluna Principal: Alternância entre Editor Inteligente de Código e Fila Simples -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock DockPanel.Dock="Bottom" Text="{Binding QueueSummary}"
-                           FontWeight="Bold" Margin="0,8,0,0"/>
+                <!-- Barra de seleção de modo (Editor de Código vs Fila Simples) -->
+                <Border Grid.Row="0" Background="#EEF2F6" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,0,0,6">
+                    <DockPanel LastChildFill="True">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <RadioButton Content="Editor Inteligente (Delphi / SQL)"
+                                         IsChecked="{Binding IsSmartEditorMode, Mode=TwoWay}"
+                                         FontWeight="SemiBold" FontSize="11.5" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <RadioButton Content="Fila Simples"
+                                         IsChecked="{Binding IsSimpleQueueMode, Mode=OneWay}"
+                                         FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center"/>
+                        </StackPanel>
 
-                <Border IsEnabled="{Binding CanEditQueue}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="QueueBlocksItemsControl" ItemsSource="{Binding Blocks}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type models:TextBlockItem}">
-                                    <Border BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="BorderBrush" Value="#CCCCCC"/>
-                                                <Setter Property="Background" Value="Transparent"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsNext}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="2"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="Typing">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="2"/>
-                                                        <Setter Property="Background" Value="#FFF8E8"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="Paused">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="2"/>
-                                                        <Setter Property="Background" Value="#FFF8E8"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="Sent">
-                                                        <Setter Property="Background" Value="#F1F7FC"/>
-                                                        <Setter Property="BorderBrush" Value="#9CC2E6"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="PartiallySent">
-                                                        <Setter Property="Background" Value="#FFF5E5"/>
-                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="1.5"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="Interrupted">
-                                                        <Setter Property="Background" Value="#FFF5E5"/>
-                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="1.5"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
-                                                        <Setter Property="Background" Value="#FDECEC"/>
-                                                        <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
-                                                        <Setter Property="BorderThickness" Value="1.5"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <StackPanel>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="Bold"/>
-                                                <Border Grid.Column="1" CornerRadius="3" Padding="6,1" Background="{Binding StatusBackgroundHex}">
-                                                    <TextBlock Text="{Binding StatusLabel}" FontWeight="Bold" Foreground="{Binding StatusColorHex}"/>
-                                                </Border>
-                                            </Grid>
-
-                                            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
-                                                     IsReadOnly="{Binding IsTypingOrPaused}"
-                                                     AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
-                                                     MaxHeight="140" VerticalScrollBarVisibility="Auto"
-                                                     FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"
-                                                     AutomationProperties.Name="{Binding Header}"/>
-
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="Gray" FontSize="11">
-                                                    <Run Text="{Binding CharacterCount, Mode=OneWay, StringFormat='Caracteres: {0}'}"/>
-                                                    <Run Text="    "/>
-                                                    <Run Text="{Binding LineCount, Mode=OneWay, StringFormat='Linhas: {0}'}"/>
-                                                </TextBlock>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                    <Button Content="↑" Padding="8,2" MinWidth="30"
-                                                            AutomationProperties.Name="Mover bloco para cima"
-                                                            Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                            CommandParameter="{Binding}"/>
-                                                    <Button Content="↓" Padding="8,2" MinWidth="30"
-                                                            AutomationProperties.Name="Mover bloco para baixo"
-                                                            Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                            CommandParameter="{Binding}"/>
-                                                    <Button Content="Definir como próximo" Padding="8,2"
-                                                            AutomationProperties.Name="Definir bloco como próximo"
-                                                            Command="{Binding DataContext.SetAsNextCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                            CommandParameter="{Binding}"/>
-                                                    <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"
-                                                            AutomationProperties.Name="Remover bloco"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                        <TextBlock Text="PREPARAÇÃO E ENVIO DE CÓDIGO" FontSize="11" FontWeight="Bold" Foreground="#334155" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </DockPanel>
                 </Border>
-            </DockPanel>
+
+                <!-- Painel 1: Editor Inteligente Delphi/SQL com Abas de Documentos e Blocos -->
+                <Grid Grid.Row="1">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSmartEditorMode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Barra de Abas de Documentos e Ações de Arquivo -->
+                    <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0" Padding="4">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <Button Content="📂 Abrir Arquivo (.pas, .sql...)" Click="OpenCodeFile_Click" Padding="8,3" Margin="0,0,4,0"
+                                        AutomationProperties.Name="Abrir arquivo de código"/>
+                                <Button Content="+ Novo Documento" Click="NewCodeDocument_Click" Padding="8,3"
+                                        AutomationProperties.Name="Criar novo documento"/>
+                            </StackPanel>
+
+                            <!-- Lista horizontal de abas de documentos abertos -->
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding DocManager.Documents}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:SourceDocument}">
+                                            <Border BorderThickness="1" CornerRadius="3" Margin="0,0,4,0" Padding="6,2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#F1F5F9"/>
+                                                        <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.DocManager.CurrentDocument}" Value="{Binding}">
+                                                                <Setter Property="Background" Value="#FFFFFF"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                                <Setter Property="BorderThickness" Value="1.5"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,6,0"
+                                                            Click="SelectDocumentTab_Click" Tag="{Binding}"
+                                                            Cursor="Hand" AutomationProperties.Name="{Binding Name}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11.5"/>
+                                                            <TextBlock Text="{Binding LineCount, StringFormat=' ({0} lin)'}" FontSize="10.5" Foreground="Gray"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Content="×" Background="Transparent" BorderThickness="0" FontWeight="Bold" FontSize="11" Foreground="#94A3B8"
+                                                            Padding="2,0" Margin="2,0,0,0" ToolTip="Fechar documento"
+                                                            Click="CloseDocumentTab_Click" Tag="{Binding}"
+                                                            AutomationProperties.Name="Fechar documento"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Barra de Metadados e Controles de Divisão Estrutural (Smart Split) -->
+                    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1,0,1,1" Padding="6,4">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <Button Content="✂ Dividir no Cursor" Click="SplitAtCaret_Click" Padding="6,2" Margin="0,0,4,0" FontSize="11"
+                                        ToolTip="Divide o bloco ativo exatamente na posição atual do cursor"
+                                        AutomationProperties.Name="Dividir no cursor"/>
+                                <Button Content="🔗 Unir com Próximo" Click="MergeNextBlock_Click" Padding="6,2" Margin="0,0,4,0" FontSize="11"
+                                        ToolTip="Mescla o bloco ativo com o bloco consecutivo"
+                                        AutomationProperties.Name="Unir com próximo bloco"/>
+                                <Button Content="🔄 Restaurar Divisão" Command="{Binding ReSplitCommand}" Padding="6,2" FontSize="11"
+                                        ToolTip="Restaura a divisão automática do documento"
+                                        AutomationProperties.Name="Restaurar divisão automática"/>
+                            </StackPanel>
+
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="Linguagem:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0"/>
+                                <ComboBox Width="120" SelectedValuePath="Tag"
+                                          SelectedValue="{Binding DocManager.CurrentLanguage, Mode=TwoWay}"
+                                          Margin="0,0,10,0" FontSize="11">
+                                    <ComboBoxItem Content="Texto Plano" Tag="{x:Static models:SourceLanguage.PlainText}"/>
+                                    <ComboBoxItem Content="Delphi / Pascal" Tag="{x:Static models:SourceLanguage.Delphi}"/>
+                                    <ComboBoxItem Content="SQL Firebird" Tag="{x:Static models:SourceLanguage.SqlFirebird}"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Nível Divisão:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0"/>
+                                <ComboBox Width="135" SelectedValuePath="Tag"
+                                          SelectedValue="{Binding DocManager.CurrentSplitLevel, Mode=TwoWay}"
+                                          Margin="0,0,10,0" FontSize="11">
+                                    <ComboBoxItem Content="1: Arquivo Completo" Tag="1"/>
+                                    <ComboBoxItem Content="2: Seções Principais" Tag="2"/>
+                                    <ComboBoxItem Content="3: Declarações / Métodos" Tag="3"/>
+                                </ComboBox>
+
+                                <TextBlock Text="{Binding DocManager.CurrentDocument.EncodingName, StringFormat='Enc: {0}'}"
+                                           VerticalAlignment="Center" FontSize="10.5" Foreground="#64748B" Margin="0,0,10,0"/>
+                            </WrapPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Editor de Código Principal (AvalonEdit) -->
+                    <Border Grid.Row="2" BorderThickness="1,0,1,1" BorderBrush="#CBD5E1">
+                        <editor:CodeEditorControl x:Name="CodeEditor"
+                                                 Text="{Binding DocManager.CurrentDocument.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 SourceLanguage="{Binding DocManager.CurrentLanguage, Mode=OneWay}"/>
+                    </Border>
+
+                    <!-- Barra Inferior de Abas dos Blocos Inteligentes Derivados -->
+                    <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="4">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock DockPanel.Dock="Left" Text="Blocos Estruturais:" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="4,0,8,0"/>
+
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding DocManager.CurrentDocument.Blocks}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:CodeBlock}">
+                                            <Border BorderThickness="1" CornerRadius="3" Margin="0,0,4,0" Padding="6,2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#FFFFFF"/>
+                                                        <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.DocManager.SelectedBlock}" Value="{Binding}">
+                                                                <Setter Property="Background" Value="#EFF6FF"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                                <Setter Property="BorderThickness" Value="1.5"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Sent">
+                                                                <Setter Property="Background" Value="#F0FDF4"/>
+                                                                <Setter Property="BorderBrush" Value="#86EFAC"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Typing">
+                                                                <Setter Property="Background" Value="#FFFBEB"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                                <Setter Property="Background" Value="#FEF2F2"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                                        Click="SelectBlockTab_Click" Tag="{Binding}" Cursor="Hand"
+                                                        AutomationProperties.Name="{Binding Title}">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="11"/>
+                                                        <TextBlock Text="{Binding LineRangeDisplay, StringFormat=' [{0}]'}" FontSize="10.5" Foreground="#64748B" Margin="4,0,0,0"/>
+                                                        <TextBlock Text="{Binding Length, StringFormat=' ({0} car)'}" FontSize="10" Foreground="#94A3B8" Margin="2,0,0,0"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Painel 2: Fila Simples Clássica de Blocos -->
+                <DockPanel Grid.Row="1">
+                    <DockPanel.Style>
+                        <Style TargetType="DockPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSimpleQueueMode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DockPanel.Style>
+
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" IsEnabled="{Binding CanEditQueue}">
+                        <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"
+                                AutomationProperties.Name="Adicionar bloco"/>
+                        <Button Content="REINICIAR FILA" Click="RestartQueue_Click"
+                                AutomationProperties.Name="Reiniciar fila"/>
+                        <Button Content="NOVA FILA" Click="NewQueue_Click"
+                                AutomationProperties.Name="Nova fila"/>
+                    </StackPanel>
+
+                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding QueueSummary}"
+                               FontWeight="Bold" Margin="0,8,0,0"/>
+
+                    <Border IsEnabled="{Binding CanEditQueue}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="QueueBlocksItemsControl" ItemsSource="{Binding Blocks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:TextBlockItem}">
+                                        <Border BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsNext}" Value="True">
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Typing">
+                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                            <Setter Property="Background" Value="#FFF8E8"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Paused">
+                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                            <Setter Property="Background" Value="#FFF8E8"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Sent">
+                                                            <Setter Property="Background" Value="#F1F7FC"/>
+                                                            <Setter Property="BorderBrush" Value="#9CC2E6"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="PartiallySent">
+                                                            <Setter Property="Background" Value="#FFF5E5"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Interrupted">
+                                                            <Setter Property="Background" Value="#FFF5E5"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                            <Setter Property="Background" Value="#FDECEC"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="Bold"/>
+                                                    <Border Grid.Column="1" CornerRadius="3" Padding="6,1" Background="{Binding StatusBackgroundHex}">
+                                                        <TextBlock Text="{Binding StatusLabel}" FontWeight="Bold" Foreground="{Binding StatusColorHex}"/>
+                                                    </Border>
+                                                </Grid>
+
+                                                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                                                         IsReadOnly="{Binding IsTypingOrPaused}"
+                                                         AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                                                         MaxHeight="140" VerticalScrollBarVisibility="Auto"
+                                                         FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"
+                                                         AutomationProperties.Name="{Binding Header}"/>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="Gray" FontSize="11">
+                                                        <Run Text="{Binding CharacterCount, Mode=OneWay, StringFormat='Caracteres: {0}'}"/>
+                                                        <Run Text="    "/>
+                                                        <Run Text="{Binding LineCount, Mode=OneWay, StringFormat='Linhas: {0}'}"/>
+                                                    </TextBlock>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                        <Button Content="↑" Padding="8,2" MinWidth="30"
+                                                                AutomationProperties.Name="Mover bloco para cima"
+                                                                Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="↓" Padding="8,2" MinWidth="30"
+                                                                AutomationProperties.Name="Mover bloco para baixo"
+                                                                Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="Definir como próximo" Padding="8,2"
+                                                                AutomationProperties.Name="Definir bloco como próximo"
+                                                                Command="{Binding DataContext.SetAsNextCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"
+                                                                AutomationProperties.Name="Remover bloco"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </DockPanel>
+            </Grid>
 
             <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch" Background="Transparent"/>
 
@@ -327,10 +543,18 @@
                         <TextBlock Text="{Binding NextBlockLabel}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
+                <!-- Botões auxiliares de digitação no Modo Smart Editor -->
+                <Button Content="DIGITAR DOCUMENTO" Command="{Binding StartDocumentCommand}" Margin="4,0,0,0" Padding="8,4"
+                        ToolTip="Digita o documento inteiro em sequência"
+                        AutomationProperties.Name="Digitar documento completo"/>
+                <Button Content="DIGITAR SELEÇÃO" Command="{Binding StartSelectionCommand}" CommandParameter="{Binding ElementName=CodeEditor, Path=SelectedText}"
+                        Margin="4,0,0,0" Padding="8,4" ToolTip="Digita exclusivamente o texto selecionado no editor"
+                        AutomationProperties.Name="Digitar seleção"/>
+
                 <Button x:Name="PauseResumeButton" Content="{Binding PauseResumeButtonWithShortcut}" Command="{Binding PauseResumeCommand}"
-                        MinWidth="150" AutomationProperties.Name="Pausar ou continuar digitação"/>
+                        MinWidth="140" Margin="4,0,0,0" AutomationProperties.Name="Pausar ou continuar digitação"/>
                 <Button x:Name="CancelButton" Content="{Binding CancelButtonWithShortcut}" Command="{Binding CancelCommand}"
-                        MinWidth="135" Background="{StaticResource DangerBrush}" Foreground="White"
+                        MinWidth="120" Background="{StaticResource DangerBrush}" Foreground="White" Margin="4,0,0,0"
                         AutomationProperties.Name="Cancelar digitação"/>
             </StackPanel>
         </DockPanel>

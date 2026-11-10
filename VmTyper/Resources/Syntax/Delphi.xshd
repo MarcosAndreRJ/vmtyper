@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="Delphi" extensions=".pas;.dpr;.inc" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#008000" exampleText="// comment" />
+  <Color name="String" foreground="#A31515" exampleText="'Hello World'" />
+  <Color name="Directive" foreground="#008080" fontStyle="italic" exampleText="{$IFDEF DEBUG}" />
+  <Color name="Keywords" foreground="#0000FF" fontWeight="bold" exampleText="procedure" />
+  <Color name="Types" foreground="#2B91AF" exampleText="Integer" />
+  <Color name="Numbers" foreground="#098658" exampleText="1234" />
+  <Color name="MethodKeywords" foreground="#0000FF" fontWeight="bold" exampleText="function" />
+
+  <RuleSet ignoreCase="true">
+    <!-- Single line comment: // -->
+    <Span color="Comment" begin="//" />
+
+    <!-- Compiler directives: {$...} -->
+    <Span color="Directive" begin="\{\$" end="\}" multiline="true" />
+
+    <!-- Multi-line comment: {...} -->
+    <Span color="Comment" begin="\{" end="\}" multiline="true" />
+
+    <!-- Multi-line comment: (*...*) -->
+    <Span color="Comment" begin="\(\*" end="\*\)" multiline="true" />
+
+    <!-- String literals: '...' -->
+    <Span color="String">
+      <Begin>'</Begin>
+      <End>'</End>
+      <RuleSet>
+        <Span begin="''" end="" />
+      </RuleSet>
+    </Span>
+
+    <!-- Numbers -->
+    <Rule color="Numbers">
+      \b0[xX][0-9a-fA-F]+\b | \b\d+(\.[0-9]+)?([eE][+-]?[0-9]+)?\b | \$[0-9a-fA-F]+
+    </Rule>
+
+    <!-- Delphi Keywords -->
+    <Keywords color="Keywords">
+      <Word>unit</Word>
+      <Word>interface</Word>
+      <Word>implementation</Word>
+      <Word>initialization</Word>
+      <Word>finalization</Word>
+      <Word>uses</Word>
+      <Word>type</Word>
+      <Word>const</Word>
+      <Word>var</Word>
+      <Word>threadvar</Word>
+      <Word>resourcestring</Word>
+      <Word>begin</Word>
+      <Word>end</Word>
+      <Word>asm</Word>
+      <Word>class</Word>
+      <Word>record</Word>
+      <Word>object</Word>
+      <Word>array</Word>
+      <Word>set</Word>
+      <Word>file</Word>
+      <Word>property</Word>
+      <Word>read</Word>
+      <Word>write</Word>
+      <Word>default</Word>
+      <Word>nodefault</Word>
+      <Word>if</Word>
+      <Word>then</Word>
+      <Word>else</Word>
+      <Word>case</Word>
+      <Word>of</Word>
+      <Word>for</Word>
+      <Word>to</Word>
+      <Word>downto</Word>
+      <Word>do</Word>
+      <Word>while</Word>
+      <Word>repeat</Word>
+      <Word>until</Word>
+      <Word>with</Word>
+      <Word>try</Word>
+      <Word>finally</Word>
+      <Word>except</Word>
+      <Word>on</Word>
+      <Word>raise</Word>
+      <Word>goto</Word>
+      <Word>label</Word>
+      <Word>inherited</Word>
+      <Word>nil</Word>
+      <Word>true</Word>
+      <Word>false</Word>
+      <Word>not</Word>
+      <Word>and</Word>
+      <Word>or</Word>
+      <Word>xor</Word>
+      <Word>shl</Word>
+      <Word>shr</Word>
+      <Word>div</Word>
+      <Word>mod</Word>
+      <Word>is</Word>
+      <Word>as</Word>
+      <Word>in</Word>
+      <Word>public</Word>
+      <Word>private</Word>
+      <Word>protected</Word>
+      <Word>published</Word>
+      <Word>strict</Word>
+      <Word>override</Word>
+      <Word>virtual</Word>
+      <Word>abstract</Word>
+      <Word>overload</Word>
+      <Word>reintroduce</Word>
+      <Word>static</Word>
+      <Word>inline</Word>
+      <Word>cdecl</Word>
+      <Word>pascal</Word>
+      <Word>register</Word>
+      <Word>safecall</Word>
+      <Word>stdcall</Word>
+      <Word>external</Word>
+      <Word>forward</Word>
+    </Keywords>
+
+    <Keywords color="MethodKeywords">
+      <Word>procedure</Word>
+      <Word>function</Word>
+      <Word>constructor</Word>
+      <Word>destructor</Word>
+      <Word>operator</Word>
+    </Keywords>
+
+    <!-- Common Types -->
+    <Keywords color="Types">
+      <Word>Integer</Word>
+      <Word>Cardinal</Word>
+      <Word>Byte</Word>
+      <Word>Word</Word>
+      <Word>Int64</Word>
+      <Word>UInt64</Word>
+      <Word>SmallInt</Word>
+      <Word>ShortInt</Word>
+      <Word>LongInt</Word>
+      <Word>LongWord</Word>
+      <Word>String</Word>
+      <Word>AnsiString</Word>
+      <Word>WideString</Word>
+      <Word>UnicodeString</Word>
+      <Word>ShortString</Word>
+      <Word>Char</Word>
+      <Word>AnsiChar</Word>
+      <Word>WideChar</Word>
+      <Word>PChar</Word>
+      <Word>PWideChar</Word>
+      <Word>PAnsiChar</Word>
+      <Word>Boolean</Word>
+      <Word>ByteBool</Word>
+      <Word>WordBool</Word>
+      <Word>LongBool</Word>
+      <Word>Single</Word>
+      <Word>Double</Word>
+      <Word>Extended</Word>
+      <Word>Currency</Word>
+      <Word>Real</Word>
+      <Word>Comp</Word>
+      <Word>Pointer</Word>
+      <Word>TObject</Word>
+      <Word>TComponent</Word>
+      <Word>TClass</Word>
+      <Word>Variant</Word>
+      <Word>OleVariant</Word>
+      <Word>TDateTime</Word>
+      <Word>TDate</Word>
+      <Word>TTime</Word>
+    </Keywords>
+  </RuleSet>
+</SyntaxDefinition>

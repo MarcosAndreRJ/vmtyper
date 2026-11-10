@@ -242,4 +242,80 @@ public partial class MainWindow : Window
 
         _viewModel?.RemoveBlock(item.Id);
     }
+
+    private void OpenCodeFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Arquivos de Código e Texto (*.pas;*.dpr;*.inc;*.sql;*.ddl;*.txt)|*.pas;*.dpr;*.inc;*.sql;*.ddl;*.txt|Arquivos Delphi (*.pas;*.dpr;*.inc)|*.pas;*.dpr;*.inc|Scripts SQL (*.sql;*.ddl)|*.sql;*.ddl|Todos os arquivos (*.*)|*.*",
+            Title = "Abrir Arquivo de Código"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                _viewModel?.DocManager.OpenFile(dialog.FileName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Erro ao abrir arquivo:\n{ex.Message}", "Erro ao abrir arquivo", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private void NewCodeDocument_Click(object sender, RoutedEventArgs e)
+    {
+        int count = (_viewModel?.DocManager.Documents.Count ?? 0) + 1;
+        _viewModel?.DocManager.CreateNewDocument(string.Empty, $"Documento {count}");
+    }
+
+    private void SelectDocumentTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.FrameworkElement { Tag: SourceDocument doc } && _viewModel != null)
+        {
+            _viewModel.DocManager.CurrentDocument = doc;
+        }
+    }
+
+    private void CloseDocumentTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.FrameworkElement { Tag: SourceDocument doc } && _viewModel != null)
+        {
+            _viewModel.DocManager.CloseDocument(doc);
+        }
+    }
+
+    private void SelectBlockTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.FrameworkElement { Tag: CodeBlock block } && _viewModel != null)
+        {
+            _viewModel.DocManager.SelectedBlock = block;
+            CodeEditor.ScrollToLine(block.StartLine);
+            CodeEditor.SelectRange(block.StartOffset, block.Length);
+        }
+    }
+
+    private void SplitAtCaret_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        int caret = CodeEditor.CaretOffset;
+        bool split = _viewModel.DocManager.SplitCurrentBlockAtCaret(caret);
+        if (!split)
+        {
+            MessageBox.Show(this, "Não foi possível dividir no cursor. Certifique-se de que o cursor está dentro do bloco selecionado.", "Divisão de Bloco", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void MergeNextBlock_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel?.DocManager.SelectedBlock is { } sb)
+        {
+            bool merged = _viewModel.DocManager.MergeBlockWithNext(sb);
+            if (!merged)
+            {
+                MessageBox.Show(this, "Não há bloco seguinte consecutivo para mesclar.", "Unir Blocos", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+    }
 }

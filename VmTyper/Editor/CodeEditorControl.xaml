@@ -1,0 +1,54 @@
+<UserControl x:Class="VmTyper.Editor.CodeEditorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Barra de ferramentas rápida do Editor (Zoom, Atalhos, Busca) -->
+        <Border Grid.Row="0" Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="0,0,0,1" Padding="6,4">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <Button Content="Desfazer (Ctrl+Z)" Click="Undo_Click" Margin="0,0,4,0" Padding="6,2" FontSize="11" ToolTip="Desfazer alteração"/>
+                    <Button Content="Refazer (Ctrl+Y)" Click="Redo_Click" Margin="0,0,8,0" Padding="6,2" FontSize="11" ToolTip="Refazer alteração"/>
+                    <Separator Margin="0,0,8,0"/>
+                    <Button Content="Buscar (Ctrl+F)" Click="Search_Click" Margin="0,0,8,0" Padding="6,2" FontSize="11" ToolTip="Abrir painel de busca"/>
+                    <Button Content="Ir para linha..." Click="GoToLine_Click" Margin="0,0,8,0" Padding="6,2" FontSize="11" ToolTip="Navegar para linha específica"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <TextBlock Text="Fonte: " VerticalAlignment="Center" FontSize="11" Foreground="#475569"/>
+                    <Button Content="−" Click="ZoomOut_Click" Width="22" Height="22" Margin="2,0" ToolTip="Diminuir tamanho da fonte"/>
+                    <TextBlock x:Name="FontSizeText" Text="13" VerticalAlignment="Center" Margin="4,0" FontSize="11" FontWeight="SemiBold"/>
+                    <Button Content="+" Click="ZoomIn_Click" Width="22" Height="22" Margin="2,0" ToolTip="Aumentar tamanho da fonte"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Editor de Código AvalonEdit -->
+        <avalonEdit:TextEditor Grid.Row="1" x:Name="TextEditor"
+                               ShowLineNumbers="True"
+                               FontFamily="Consolas, Cascadia Code, Courier New"
+                               FontSize="13"
+                               WordWrap="False"
+                               HorizontalScrollBarVisibility="Auto"
+                               VerticalScrollBarVisibility="Auto">
+        </avalonEdit:TextEditor>
+
+        <!-- Barra de status do editor (Linha, Coluna, Seleção) -->
+        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="6,2">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="PositionText" DockPanel.Dock="Left" Text="Lin 1, Col 1" FontSize="10.5" Foreground="#64748B"/>
+                <TextBlock x:Name="SelectionInfoText" DockPanel.Dock="Right" Text="0 carac. selecionados" FontSize="10.5" Foreground="#64748B"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -21,6 +21,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AvalonEdit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Syntax\*.xshd" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="VmTyper.Tests" />
     <InternalsVisibleTo Include="VmTyper.IntegrationTests" />
     <InternalsVisibleTo Include="WebView2Poc" />

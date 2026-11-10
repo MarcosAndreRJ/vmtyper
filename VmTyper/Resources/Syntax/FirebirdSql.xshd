@@ -1,0 +1,214 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="FirebirdSql" extensions=".sql;.ddl" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#008000" exampleText="-- comment" />
+  <Color name="String" foreground="#A31515" exampleText="'Hello World'" />
+  <Color name="Keywords" foreground="#0000FF" fontWeight="bold" exampleText="SELECT" />
+  <Color name="PsqlKeywords" foreground="#800080" fontWeight="bold" exampleText="EXECUTE BLOCK" />
+  <Color name="Functions" foreground="#795E26" exampleText="COUNT" />
+  <Color name="Types" foreground="#2B91AF" exampleText="VARCHAR" />
+  <Color name="Numbers" foreground="#098658" exampleText="1234" />
+  <Color name="Parameters" foreground="#D16969" fontWeight="bold" exampleText=":PARAM1" />
+  <Color name="Directives" foreground="#AF00DB" fontWeight="bold" exampleText="SET TERM" />
+
+  <RuleSet ignoreCase="true">
+    <!-- Single line comment: - - -->
+    <Span color="Comment" begin="--" />
+
+    <!-- Multi-line comment: /*...*/ -->
+    <Span color="Comment" begin="/\*" end="\*/" multiline="true" />
+
+    <!-- String literals: '...' -->
+    <Span color="String">
+      <Begin>'</Begin>
+      <End>'</End>
+      <RuleSet>
+        <Span begin="''" end="" />
+      </RuleSet>
+    </Span>
+
+    <!-- Parameters: :identifier -->
+    <Rule color="Parameters">
+      :[a-zA-Z0-9_$]+
+    </Rule>
+
+    <!-- Numbers -->
+    <Rule color="Numbers">
+      \b\d+(\.[0-9]+)?\b
+    </Rule>
+
+    <!-- Client Tool Directives -->
+    <Keywords color="Directives">
+      <Word>SET</Word>
+      <Word>TERM</Word>
+    </Keywords>
+
+    <!-- Standard SQL / DML / DDL Keywords -->
+    <Keywords color="Keywords">
+      <Word>SELECT</Word>
+      <Word>FROM</Word>
+      <Word>WHERE</Word>
+      <Word>GROUP</Word>
+      <Word>BY</Word>
+      <Word>HAVING</Word>
+      <Word>ORDER</Word>
+      <Word>ASC</Word>
+      <Word>DESC</Word>
+      <Word>JOIN</Word>
+      <Word>INNER</Word>
+      <Word>LEFT</Word>
+      <Word>RIGHT</Word>
+      <Word>FULL</Word>
+      <Word>OUTER</Word>
+      <Word>CROSS</Word>
+      <Word>NATURAL</Word>
+      <Word>ON</Word>
+      <Word>AS</Word>
+      <Word>UNION</Word>
+      <Word>ALL</Word>
+      <Word>DISTINCT</Word>
+      <Word>FIRST</Word>
+      <Word>SKIP</Word>
+      <Word>ROWS</Word>
+      <Word>TO</Word>
+      <Word>INSERT</Word>
+      <Word>INTO</Word>
+      <Word>VALUES</Word>
+      <Word>UPDATE</Word>
+      <Word>DELETE</Word>
+      <Word>MERGE</Word>
+      <Word>MATCHED</Word>
+      <Word>USING</Word>
+      <Word>WHEN</Word>
+      <Word>THEN</Word>
+      <Word>ELSE</Word>
+      <Word>END</Word>
+      <Word>CASE</Word>
+      <Word>AND</Word>
+      <Word>OR</Word>
+      <Word>NOT</Word>
+      <Word>IN</Word>
+      <Word>EXISTS</Word>
+      <Word>BETWEEN</Word>
+      <Word>LIKE</Word>
+      <Word>IS</Word>
+      <Word>NULL</Word>
+      <Word>CONTAINING</Word>
+      <Word>STARTING</Word>
+      <Word>SIMILAR</Word>
+      <Word>WITH</Word>
+      <Word>RECURSIVE</Word>
+      <Word>CREATE</Word>
+      <Word>ALTER</Word>
+      <Word>DROP</Word>
+      <Word>RECREATE</Word>
+      <Word>TABLE</Word>
+      <Word>VIEW</Word>
+      <Word>INDEX</Word>
+      <Word>UNIQUE</Word>
+      <Word>CONSTRAINT</Word>
+      <Word>PRIMARY</Word>
+      <Word>KEY</Word>
+      <Word>FOREIGN</Word>
+      <Word>REFERENCES</Word>
+      <Word>CHECK</Word>
+      <Word>DEFAULT</Word>
+      <Word>SEQUENCE</Word>
+      <Word>GENERATOR</Word>
+      <Word>DOMAIN</Word>
+      <Word>EXCEPTION</Word>
+      <Word>ROLE</Word>
+      <Word>USER</Word>
+      <Word>GRANT</Word>
+      <Word>REVOKE</Word>
+      <Word>COMMIT</Word>
+      <Word>ROLLBACK</Word>
+    </Keywords>
+
+    <!-- PSQL Keywords -->
+    <Keywords color="PsqlKeywords">
+      <Word>PROCEDURE</Word>
+      <Word>TRIGGER</Word>
+      <Word>FUNCTION</Word>
+      <Word>PACKAGE</Word>
+      <Word>BODY</Word>
+      <Word>EXECUTE</Word>
+      <Word>BLOCK</Word>
+      <Word>DO</Word>
+      <Word>BEGIN</Word>
+      <Word>END</Word>
+      <Word>DECLARE</Word>
+      <Word>VARIABLE</Word>
+      <Word>RETURNS</Word>
+      <Word>SUSPEND</Word>
+      <Word>EXIT</Word>
+      <Word>LEAVE</Word>
+      <Word>WHILE</Word>
+      <Word>FOR</Word>
+      <Word>LOOP</Word>
+      <Word>IF</Word>
+      <Word>AUTONOMOUS</Word>
+      <Word>TRANSACTION</Word>
+      <Word>BEFORE</Word>
+      <Word>AFTER</Word>
+      <Word>POSITION</Word>
+      <Word>ACTIVE</Word>
+      <Word>INACTIVE</Word>
+    </Keywords>
+
+    <!-- Built-in Functions -->
+    <Keywords color="Functions">
+      <Word>COUNT</Word>
+      <Word>SUM</Word>
+      <Word>AVG</Word>
+      <Word>MIN</Word>
+      <Word>MAX</Word>
+      <Word>UPPER</Word>
+      <Word>LOWER</Word>
+      <Word>SUBSTRING</Word>
+      <Word>TRIM</Word>
+      <Word>CAST</Word>
+      <Word>COALESCE</Word>
+      <Word>NULLIF</Word>
+      <Word>GEN_ID</Word>
+      <Word>NEXT</Word>
+      <Word>VALUE</Word>
+      <Word>DATEADD</Word>
+      <Word>DATEDIFF</Word>
+      <Word>EXTRACT</Word>
+      <Word>POSITION</Word>
+      <Word>REPLACE</Word>
+      <Word>OCTET_LENGTH</Word>
+      <Word>CHAR_LENGTH</Word>
+      <Word>CHARACTER_LENGTH</Word>
+      <Word>RDB$GET_CONTEXT</Word>
+      <Word>RDB$SET_CONTEXT</Word>
+    </Keywords>
+
+    <!-- Firebird Data Types -->
+    <Keywords color="Types">
+      <Word>INTEGER</Word>
+      <Word>INT</Word>
+      <Word>SMALLINT</Word>
+      <Word>BIGINT</Word>
+      <Word>INT128</Word>
+      <Word>FLOAT</Word>
+      <Word>DOUBLE</Word>
+      <Word>PRECISION</Word>
+      <Word>DECIMAL</Word>
+      <Word>NUMERIC</Word>
+      <Word>VARCHAR</Word>
+      <Word>CHAR</Word>
+      <Word>CHARACTER</Word>
+      <Word>BLOB</Word>
+      <Word>SUB_TYPE</Word>
+      <Word>TEXT</Word>
+      <Word>BINARY</Word>
+      <Word>SEGMENT</Word>
+      <Word>SIZE</Word>
+      <Word>DATE</Word>
+      <Word>TIME</Word>
+      <Word>TIMESTAMP</Word>
+      <Word>BOOLEAN</Word>
+    </Keywords>
+  </RuleSet>
+</SyntaxDefinition>
