@@ -104,18 +104,18 @@ VmTyper/
 
 ## 3. Compilar
 
-**Linha de comando** (com .NET 8 SDK instalado):
+**Linha de comando** (com .NET 10 SDK instalado):
 
 ```bash
 cd VmTyper
 dotnet build VmTyper.sln -c Release
 ```
 
-O executável fica em `VmTyper\bin\x64\Release\net8.0-windows\VmTyper.exe`.
+O executável fica em `VmTyper\bin\x64\Release\net10.0-windows\VmTyper.exe`.
 
-**Visual Studio 2022:**
+**Visual Studio 2022 / 2026:**
 1. Abra `VmTyper.sln`.
-2. Confirme que o SDK do .NET 8 está instalado (`Visual Studio Installer` → *Individual components* → *.NET 8.0 Runtime*).
+2. Confirme que o SDK do .NET 10 está instalado (`Visual Studio Installer` → *Individual components* → *.NET 10.0 Runtime / SDK*).
 3. Defina a plataforma de solução como `x64` (já é o padrão do projeto).
 4. `Ctrl+Shift+B` para compilar, `F5` para rodar em modo Debug.
 
