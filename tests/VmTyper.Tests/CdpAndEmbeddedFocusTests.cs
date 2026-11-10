@@ -4,9 +4,11 @@ using VmTyper.Models;
 using VmTyper.Native;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
+using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class CdpAndEmbeddedFocusTests
 {
     private sealed class RecordingCdpDispatcher : ICdpDispatcher

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Phase5UiAndViewModelsTests
 {
     [Fact]

@@ -6,9 +6,11 @@ using VmTyper.Helpers;
 using VmTyper.Models;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
+using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class DiagnosticsAndClassifierTests
 {
     private sealed class InstantDelayProvider : IDelayProvider

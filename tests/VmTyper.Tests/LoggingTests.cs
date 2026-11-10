@@ -1,7 +1,9 @@
 using VmTyper.Models;
+using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class LoggingTests : IDisposable
 {
     private readonly EngineHarness _h = new();

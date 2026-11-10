@@ -3,9 +3,11 @@ using VmTyper.Models;
 using VmTyper.Services;
 using VmTyper.Services.Persistence;
 using VmTyper.Tests.Fakes;
+using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class PersistenceTests : IDisposable
 {
     private const string Corrupt = "[{\"Id\":\"5b1c\", \"Text\":\"fila preparada importante\"  <-- truncado";

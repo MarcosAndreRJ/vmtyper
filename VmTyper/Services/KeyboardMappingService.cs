@@ -171,6 +171,17 @@ public sealed class KeyboardMappingService
                 }
 
                 var deadCombo = TryResolveSingle(deadChar, layout);
+                if (deadCombo is null && deadChar == '´')
+                {
+                    // No US-International e layouts semelhantes, o apóstrofo (') atua como tecla morta de acento agudo.
+                    deadCombo = TryResolveSingle('\'', layout);
+                }
+                else if (deadCombo is null && deadChar == '¨')
+                {
+                    // No US-International, aspas duplas (") atuam como trema/diérese.
+                    deadCombo = TryResolveSingle('"', layout);
+                }
+
                 if (deadCombo is null)
                 {
                     ok = false;

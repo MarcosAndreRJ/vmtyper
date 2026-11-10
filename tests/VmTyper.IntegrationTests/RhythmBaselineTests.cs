@@ -33,6 +33,7 @@ public sealed class MeasurementFactAttribute : FactAttribute
 /// injetar nada na sessão.
 /// </summary>
 [Trait("Category", "Measurement")]
+[Trait("Category", "Integration")]
 public sealed class RhythmBaselineTests
 {
     private static readonly int[] Delays = { 0, 1, 3, 10, 30 };

@@ -4,6 +4,7 @@ using VmTyper.Native;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
 using VmTyper.ViewModels;
+using Xunit;
 
 namespace VmTyper.Tests;
 
@@ -30,6 +31,7 @@ internal sealed class FakeHotkeyRegistrar : IHotkeyRegistrar
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class TypingSessionCoordinatorTests : IDisposable
 {
     private readonly TempDir _dir = new();

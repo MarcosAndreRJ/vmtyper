@@ -2,6 +2,7 @@ using VmTyper.Models;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
 using VmTyper.ViewModels;
+using Xunit;
 
 namespace VmTyper.Tests;
 
@@ -50,6 +51,7 @@ internal sealed class FakeForegroundWindowProvider : IForegroundWindowProvider
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class TargetGuardTests : IDisposable
 {
     private readonly TempDir _dir = new();

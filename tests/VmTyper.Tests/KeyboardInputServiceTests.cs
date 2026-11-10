@@ -2,9 +2,11 @@ using VmTyper.Models;
 using VmTyper.Native;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
+using Xunit;
 
 namespace VmTyper.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class KeyboardInputServiceTests : IDisposable
 {
     private readonly EngineHarness _h = new();
