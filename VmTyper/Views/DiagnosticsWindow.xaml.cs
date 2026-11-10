@@ -1,9 +1,12 @@
+using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using VmTyper.Models;
-using VmTyper.Native;
 using VmTyper.Services;
+using VmTyper.ViewModels;
 using InputMethod = VmTyper.Models.InputMethod;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace VmTyper.Views;
 
@@ -14,6 +17,7 @@ public partial class DiagnosticsWindow : Window
     private readonly IKeyboardInputService _typingService;
     private readonly LogService _log;
     private readonly TypingSessionCoordinator _coordinator;
+    public DiagnosticsViewModel ViewModel { get; }
 
     private TypingSessionLease? _activeLease;
 
@@ -33,9 +37,17 @@ public partial class DiagnosticsWindow : Window
         _log = log;
         _coordinator = coordinator;
 
+        ViewModel = new DiagnosticsViewModel
+        {
+            ComparisonExpectedText = DefaultTestText
+        };
+        DataContext = ViewModel;
+
         TestTextBox.Text = DefaultTestText;
         LogListBox.ItemsSource = _log.Lines;
         UpdateExpectedFingerprint();
+        ViewModel.LoadLatestSessionFromDirectory();
+        ViewModel.LoadBenchmarksFromDirectory();
 
         Closing += (_, _) =>
         {
@@ -46,6 +58,10 @@ public partial class DiagnosticsWindow : Window
     private void TestTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         UpdateExpectedFingerprint();
+        if (ViewModel is not null)
+        {
+            ViewModel.ComparisonExpectedText = TestTextBox.Text ?? string.Empty;
+        }
     }
 
     private void UpdateExpectedFingerprint()
@@ -62,12 +78,58 @@ public partial class DiagnosticsWindow : Window
             $"L:{letters} D:{digits} P:{punct} S:{spaces} C:{controls}";
     }
 
+    private void ReloadLatestSession_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.LoadLatestSessionFromDirectory();
+    }
+
+    private void OpenSessionFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Abrir arquivo de sessão JSONL",
+            Filter = "Arquivos JSONL (*.jsonl)|*.jsonl|Todos os arquivos (*.*)|*.*"
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            ViewModel.LoadSessionJsonlFile(dlg.FileName);
+        }
+    }
+
     private void PurgeDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         var engine = new TypingDiagnosticsEngine();
         int removed = engine.PurgeAllDiagnostics();
         StatusText.Text = $"Diagnósticos excluídos ({removed} arquivo(s)).";
         _log.Info($"Excluídos {removed} arquivo(s) de diagnóstico JSONL.");
+        ViewModel.LoadLatestSessionFromDirectory();
+    }
+
+    private void ImportObserverJson_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Importar JSON do receptor ou da página HTML de diagnóstico",
+            Filter = "Arquivos JSON (*.json)|*.json|Todos os arquivos (*.*)|*.*"
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            try
+            {
+                string json = File.ReadAllText(dlg.FileName, Encoding.UTF8);
+                ViewModel.ImportAndCompareObserverJson(json);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(this, $"Erro ao importar JSON:\n{ex.Message}", "Erro na comparação",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void ReloadBenchmarks_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.LoadBenchmarksFromDirectory();
     }
 
     private async void SendTest_Click(object sender, RoutedEventArgs e)
@@ -112,7 +174,8 @@ public partial class DiagnosticsWindow : Window
             await _typingService.TypeTextAsync(TestTextBox.Text, options, null, lease.Pause, token);
             _log.Info("=== Fim do teste de diagnóstico ===");
 
-            StatusText.Text = "Teste concluído.";
+            StatusText.Text = "Teste enviado (recebimento não verificado).";
+            ViewModel.LoadLatestSessionFromDirectory();
         }
         catch (OperationCanceledException)
         {

@@ -12,6 +12,7 @@ public sealed class SettingsFormState
     public string CharDelayText { get; set; } = "2";
     public string EnterDelayText { get; set; } = "20";
     public string CountdownText { get; set; } = "3";
+    public string ResumeCountdownText { get; set; } = "2";
     public string MethodTag { get; set; } = "Automatico";
     public string TargetLayoutTag { get; set; } = "HostForeground";
     public bool AdaptiveTiming { get; set; }
@@ -27,6 +28,12 @@ public sealed class SettingsFormState
     public string ExpectedBrowserTag { get; set; } = "Chrome";
     public string QueueTextPersistenceTag { get; set; } = "Full";
     public bool DetailedTrace { get; set; }
+    public bool EnableDiagnosticsJsonl { get; set; } = true;
+    public string DiagnosticsRetentionText { get; set; } = "20";
+    public bool EmbeddedBrowser { get; set; }
+    public bool CdpInput { get; set; }
+    public string TargetEnvironmentTag { get; set; } = "External";
+    public string EmbeddedSubMethodTag { get; set; } = "SendInput";
     public bool MinimizeToTray { get; set; } = true;
     public bool StartMinimized { get; set; }
     public bool AlwaysOnTop { get; set; }
@@ -45,6 +52,8 @@ public static class SettingsMapper
     public const int MaxDelayMs = 2000;
     public const int MinCountdownSeconds = 0;
     public const int MaxCountdownSeconds = 30;
+    public const int MinRetentionSessions = 1;
+    public const int MaxRetentionSessions = 200;
 
     public static SettingsFormState ToFormState(AppSettings s)
     {
@@ -53,6 +62,7 @@ public static class SettingsMapper
             CharDelayText = s.CharDelayMs.ToString(),
             EnterDelayText = s.EnterDelayMs.ToString(),
             CountdownText = s.CountdownSeconds.ToString(),
+            ResumeCountdownText = s.ResumeCountdownSeconds.ToString(),
             MethodTag = s.Method.ToString(),
             TargetLayoutTag = string.IsNullOrWhiteSpace(s.TargetLayout) ? "HostForeground" : s.TargetLayout,
             AdaptiveTiming = s.Features.AdaptiveTiming,
@@ -68,6 +78,12 @@ public static class SettingsMapper
             ExpectedBrowserTag = s.ExpectedBrowser.ToString(),
             QueueTextPersistenceTag = s.QueueTextPersistence.ToString(),
             DetailedTrace = s.Features.DetailedTrace,
+            EnableDiagnosticsJsonl = s.EnableDiagnosticsJsonl,
+            DiagnosticsRetentionText = s.DiagnosticsRetentionSessions.ToString(),
+            EmbeddedBrowser = s.Features.EmbeddedBrowser,
+            CdpInput = s.Features.CdpInput,
+            TargetEnvironmentTag = string.IsNullOrWhiteSpace(s.TargetEnvironment) ? "External" : s.TargetEnvironment,
+            EmbeddedSubMethodTag = string.IsNullOrWhiteSpace(s.EmbeddedSubMethod) ? "SendInput" : s.EmbeddedSubMethod,
             MinimizeToTray = s.MinimizeToTray,
             StartMinimized = s.StartMinimized,
             AlwaysOnTop = s.AlwaysOnTop,
@@ -93,6 +109,16 @@ public static class SettingsMapper
         if (!int.TryParse(form.CountdownText, out int countdown) || countdown < MinCountdownSeconds || countdown > MaxCountdownSeconds)
         {
             errors.Add($"Contagem regressiva inválida (deve estar entre {MinCountdownSeconds} e {MaxCountdownSeconds} s).");
+        }
+
+        if (!int.TryParse(form.ResumeCountdownText, out int resumeCountdown) || resumeCountdown < MinCountdownSeconds || resumeCountdown > MaxCountdownSeconds)
+        {
+            errors.Add($"Contagem de retomada inválida (deve estar entre {MinCountdownSeconds} e {MaxCountdownSeconds} s).");
+        }
+
+        if (!int.TryParse(form.DiagnosticsRetentionText, out int retention) || retention < MinRetentionSessions || retention > MaxRetentionSessions)
+        {
+            errors.Add($"Retenção de diagnósticos inválida (deve estar entre {MinRetentionSessions} e {MaxRetentionSessions} sessões).");
         }
 
         var activeSubs = new List<CharacterSubstitution>();
@@ -123,6 +149,7 @@ public static class SettingsMapper
         result.CharDelayMs = charDelay;
         result.EnterDelayMs = enterDelay;
         result.CountdownSeconds = countdown;
+        result.ResumeCountdownSeconds = resumeCountdown;
         result.Method = form.MethodTag switch
         {
             "TecladoFisico" => InputMethod.TecladoFisico,
@@ -142,6 +169,16 @@ public static class SettingsMapper
         result.EnableTargetGuard = form.EnableTargetGuard;
         result.Features.TargetGuardStrict = form.TargetGuardStrict;
         result.Features.DetailedTrace = form.DetailedTrace;
+        result.Features.EmbeddedBrowser = form.EmbeddedBrowser;
+        result.Features.CdpInput = form.CdpInput;
+        result.EnableDiagnosticsJsonl = form.EnableDiagnosticsJsonl;
+        result.DiagnosticsRetentionSessions = retention;
+        result.TargetEnvironment = form.EmbeddedBrowser && string.Equals(form.TargetEnvironmentTag, "Embedded", StringComparison.OrdinalIgnoreCase)
+            ? "Embedded"
+            : "External";
+        result.EmbeddedSubMethod = form.CdpInput && string.Equals(form.EmbeddedSubMethodTag, "Cdp", StringComparison.OrdinalIgnoreCase)
+            ? "Cdp"
+            : "SendInput";
         result.ValidateTargetWindow = form.ValidateTargetWindow;
         result.ExpectedBrowser = form.ExpectedBrowserTag switch
         {
@@ -184,12 +221,13 @@ public static class SettingsMapper
         ComboLabel = sub.ComboLabel
     };
 
-    private static AppSettings CloneSettings(AppSettings s) => new()
+    public static AppSettings CloneSettings(AppSettings s) => new()
     {
         CharDelayMs = s.CharDelayMs,
         EnterDelayMs = s.EnterDelayMs,
         Method = s.Method,
         CountdownSeconds = s.CountdownSeconds,
+        ResumeCountdownSeconds = s.ResumeCountdownSeconds,
         TypingProfile = s.TypingProfile,
         CustomProfile = s.CustomProfile,
         PreserveOriginalIndentation = s.PreserveOriginalIndentation,
@@ -200,6 +238,10 @@ public static class SettingsMapper
         ExpectedBrowser = s.ExpectedBrowser,
         EnableTargetGuard = s.EnableTargetGuard,
         TargetLayout = s.TargetLayout,
+        TargetEnvironment = s.TargetEnvironment,
+        EmbeddedSubMethod = s.EmbeddedSubMethod,
+        EnableDiagnosticsJsonl = s.EnableDiagnosticsJsonl,
+        DiagnosticsRetentionSessions = s.DiagnosticsRetentionSessions,
         QueueTextPersistence = s.QueueTextPersistence,
         Features = new FeatureFlags
         {

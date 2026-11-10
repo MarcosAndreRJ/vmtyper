@@ -191,6 +191,20 @@ public partial class MainWindow : Window
         window.Show();
     }
 
+    private void EnvironmentCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_viewModel is null || !_viewModel.CanEditQueue) return;
+        if (string.Equals(_viewModel.SelectedEnvironmentTag, "Embedded", StringComparison.OrdinalIgnoreCase) &&
+            _viewModel.Settings.Features.EmbeddedBrowser)
+        {
+            var embeddedWindow = new EmbeddedBrowserWindow(App.LogServiceInstance, App.CoordinatorInstance, _viewModel.Settings.Features)
+            {
+                Owner = this
+            };
+            embeddedWindow.Show();
+        }
+    }
+
     private void AddBlock_Click(object sender, RoutedEventArgs e)
     {
         _viewModel?.AddBlock();

@@ -36,7 +36,7 @@ public sealed class TextBlockItem : ObservableObject
                 OnPropertyChanged(nameof(CharacterCount));
                 OnPropertyChanged(nameof(LineCount));
                 OnPropertyChanged(nameof(IsEmpty));
-                OnPropertyChanged(nameof(StatusLabel));
+                NotifyVisualStateChanged();
             }
         }
     }
@@ -51,8 +51,8 @@ public sealed class TextBlockItem : ObservableObject
         {
             if (SetField(ref _status, value))
             {
-                OnPropertyChanged(nameof(StatusLabel));
                 OnPropertyChanged(nameof(IsTypingOrPaused));
+                NotifyVisualStateChanged();
             }
         }
     }
@@ -67,7 +67,7 @@ public sealed class TextBlockItem : ObservableObject
         internal set
         {
             if (SetField(ref _isNext, value))
-                OnPropertyChanged(nameof(StatusLabel));
+                NotifyVisualStateChanged();
         }
     }
 
@@ -78,7 +78,7 @@ public sealed class TextBlockItem : ObservableObject
         set
         {
             if (SetField(ref _sentUpToIndex, value))
-                OnPropertyChanged(nameof(StatusLabel));
+                NotifyVisualStateChanged();
         }
     }
 
@@ -89,7 +89,7 @@ public sealed class TextBlockItem : ObservableObject
         set
         {
             if (SetField(ref _lastError, value))
-                OnPropertyChanged(nameof(StatusLabel));
+                NotifyVisualStateChanged();
         }
     }
 
@@ -108,8 +108,18 @@ public sealed class TextBlockItem : ObservableObject
         set
         {
             if (SetField(ref _persistenceNote, value))
-                OnPropertyChanged(nameof(StatusLabel));
+                NotifyVisualStateChanged();
         }
+    }
+
+    private void NotifyVisualStateChanged()
+    {
+        OnPropertyChanged(nameof(StatusIcon));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusLabel));
+        OnPropertyChanged(nameof(StatusColorHex));
+        OnPropertyChanged(nameof(StatusBackgroundHex));
+        OnPropertyChanged(nameof(DeliveryState));
     }
 
     [JsonIgnore]
@@ -133,30 +143,75 @@ public sealed class TextBlockItem : ObservableObject
     public bool IsEmpty => string.IsNullOrWhiteSpace(Text);
 
     [JsonIgnore]
-    public string StatusLabel
+    public DeliverySemanticState DeliveryState => DeliverySemantics.FromBlockStatus(Status);
+
+    [JsonIgnore]
+    public string StatusIcon => Status switch
+    {
+        TextBlockStatus.Sent => "↗",
+        TextBlockStatus.Typing => "⌨",
+        TextBlockStatus.Paused => "⏸",
+        TextBlockStatus.PartiallySent => "◐",
+        TextBlockStatus.Failed => "✗",
+        TextBlockStatus.Interrupted => "⚠",
+        TextBlockStatus.Empty => "○",
+        TextBlockStatus.Ready when IsNext => "▶",
+        TextBlockStatus.Ready => "●",
+        _ => "•"
+    };
+
+    [JsonIgnore]
+    public string StatusText
     {
         get
         {
-            string baseLabel = Status switch
+            string baseText = Status switch
             {
-                TextBlockStatus.Sent => "✓ Enviado",
-                TextBlockStatus.Typing => "⌨ Digitando",
-                TextBlockStatus.Paused => "⏸ Pausado",
-                TextBlockStatus.PartiallySent => $"◐ Parcial ({SentUpToIndex})",
-                TextBlockStatus.Failed => "✗ Falhou",
-                TextBlockStatus.Interrupted => "⚠ Interrompido",
-                TextBlockStatus.Empty => string.IsNullOrEmpty(PersistenceNote) ? "○ Vazio" : $"○ Vazio ({PersistenceNote})",
-                TextBlockStatus.Ready when IsNext => "▶ Próximo",
-                TextBlockStatus.Ready => "○ Pronto",
+                TextBlockStatus.Sent => "Enviado",
+                TextBlockStatus.Typing => "Digitando",
+                TextBlockStatus.Paused => "Pausado",
+                TextBlockStatus.PartiallySent => CharacterCount > 0
+                    ? $"Parcial ({SentUpToIndex}/{CharacterCount})"
+                    : $"Parcial ({SentUpToIndex})",
+                TextBlockStatus.Failed => "Falha",
+                TextBlockStatus.Interrupted => "Interrompido",
+                TextBlockStatus.Empty => string.IsNullOrEmpty(PersistenceNote) ? "Vazio" : $"Vazio ({PersistenceNote})",
+                TextBlockStatus.Ready when IsNext => "Próximo ▶",
+                TextBlockStatus.Ready => "Pronto",
                 _ => Status.ToString()
             };
 
             if (IsNext && Status is not TextBlockStatus.Ready and not TextBlockStatus.Typing and not TextBlockStatus.Paused)
             {
-                return $"▶ Próximo · {baseLabel}";
+                return $"Próximo ▶ · {baseText}";
             }
 
-            return baseLabel;
+            return baseText;
         }
     }
+
+    [JsonIgnore]
+    public string StatusColorHex => Status switch
+    {
+        TextBlockStatus.Sent => "#1E6BB8",
+        TextBlockStatus.Typing or TextBlockStatus.Paused or TextBlockStatus.Interrupted => "#B86B11",
+        TextBlockStatus.PartiallySent => "#B86B11",
+        TextBlockStatus.Failed => "#B82E2E",
+        TextBlockStatus.Ready when IsNext => "#1F7A3E",
+        TextBlockStatus.Ready => "#333333",
+        _ => "#777777"
+    };
+
+    [JsonIgnore]
+    public string StatusBackgroundHex => Status switch
+    {
+        TextBlockStatus.Sent => "#F1F7FC",
+        TextBlockStatus.Typing or TextBlockStatus.Paused => "#FFF8E8",
+        TextBlockStatus.PartiallySent or TextBlockStatus.Interrupted => "#FFF5E5",
+        TextBlockStatus.Failed => "#FDECEC",
+        _ => "#FFFFFF"
+    };
+
+    [JsonIgnore]
+    public string StatusLabel => $"{StatusIcon} {StatusText}";
 }

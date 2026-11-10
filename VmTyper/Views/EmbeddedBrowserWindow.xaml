@@ -9,10 +9,14 @@
         <Border DockPanel.Dock="Top" Padding="8" BorderBrush="#CCCCCC" BorderThickness="0,0,0,1" Background="#F7F7F9">
             <StackPanel Orientation="Vertical">
                 <DockPanel Margin="0,0,0,6">
-                    <Button x:Name="BackButton" Content="◀ Voltar" Click="Back_Click" Padding="8,3" Margin="0,0,4,0"/>
-                    <Button x:Name="ForwardButton" Content="Avançar ▶" Click="Forward_Click" Padding="8,3" Margin="0,0,4,0"/>
-                    <Button x:Name="ReloadButton" Content="↻ Atualizar" Click="Reload_Click" Padding="8,3" Margin="0,0,8,0"/>
-                    <Button DockPanel.Dock="Right" Content="Ir" Click="Navigate_Click" Padding="12,3" Margin="4,0,0,0"/>
+                    <Button x:Name="BackButton" Content="◀ Voltar" Click="Back_Click" Padding="8,3" Margin="0,0,4,0"
+                            AutomationProperties.Name="Voltar página"/>
+                    <Button x:Name="ForwardButton" Content="Avançar ▶" Click="Forward_Click" Padding="8,3" Margin="0,0,4,0"
+                            AutomationProperties.Name="Avançar página"/>
+                    <Button x:Name="ReloadButton" Content="↻ Atualizar" Click="Reload_Click" Padding="8,3" Margin="0,0,8,0"
+                            AutomationProperties.Name="Atualizar página"/>
+                    <Button DockPanel.Dock="Right" Content="Ir" Click="Navigate_Click" Padding="12,3" Margin="4,0,0,0"
+                            AutomationProperties.Name="Navegar para o endereço"/>
                     <TextBox x:Name="AddressTextBox" VerticalContentAlignment="Center" FontFamily="Consolas" FontSize="12.5"
                              Text="https://diag.vmtyper.local/index.html" KeyDown="AddressTextBox_KeyDown"/>
                 </DockPanel>

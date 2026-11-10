@@ -105,6 +105,13 @@ public sealed class AppSettings
     public ExpectedBrowser ExpectedBrowser { get; set; } = ExpectedBrowser.Chrome;
     public bool EnableTargetGuard { get; set; } = true;
     public string TargetLayout { get; set; } = "HostForeground";
+    public int ResumeCountdownSeconds { get; set; } = 2;
+
+    // --- Ambiente e Diagnóstico ---
+    public string TargetEnvironment { get; set; } = "External";
+    public string EmbeddedSubMethod { get; set; } = "SendInput";
+    public bool EnableDiagnosticsJsonl { get; set; } = true;
+    public int DiagnosticsRetentionSessions { get; set; } = 20;
 
     // --- Privacidade e recursos ---
     public QueueTextPersistence QueueTextPersistence { get; set; } = QueueTextPersistence.Full;

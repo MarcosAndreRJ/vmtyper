@@ -4,7 +4,7 @@
         xmlns:helpers="clr-namespace:VmTyper.Helpers"
         xmlns:models="clr-namespace:VmTyper.Models"
         Title="VmTyper — Digitação automatizada para VM via navegador"
-        Width="1000" Height="680" MinWidth="820" MinHeight="560"
+        Width="1060" Height="710" MinWidth="860" MinHeight="580"
         WindowStartupLocation="CenterScreen"
         StateChanged="Window_StateChanged"
         Closing="Window_Closing">
@@ -16,29 +16,106 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Barra superior -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" IsEnabled="{Binding CanEditQueue}">
-                <Button Content="Teste de Teclado" Click="OpenDiagnostics_Click"/>
-                <Button Content="Configurações" Click="OpenSettings_Click"/>
-            </StackPanel>
-            <TextBlock Text="VmTyper" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-        </DockPanel>
+        <!-- §1.1 Barra de sessão (topo) -->
+        <Border Grid.Row="0" Background="#F5F7FA" BorderBrush="#D8DEE9" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,8">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" IsEnabled="{Binding CanEditQueue}">
+                    <Button Content="Diagnóstico" Click="OpenDiagnostics_Click"
+                            AutomationProperties.Name="Diagnóstico"/>
+                    <Button Content="Configurações" Click="OpenSettings_Click"
+                            AutomationProperties.Name="Configurações"/>
+                </StackPanel>
+
+                <WrapPanel VerticalAlignment="Center" IsEnabled="{Binding CanEditQueue}">
+                    <TextBlock Text="VmTyper" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                    <!-- Indicador do destino (ícone + processo + título truncado + estado do guard) -->
+                    <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="3" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TargetIndicatorLabel"
+                                   Text="{Binding TargetIndicatorText}"
+                                   FontWeight="SemiBold" FontSize="11.5"
+                                   ToolTip="Destino monitorado pelo TargetGuard (Monitorando / Perdido / Desligado)"/>
+                    </Border>
+
+                    <!-- Método compacto -->
+                    <TextBlock Text="Método:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
+                    <ComboBox Width="118" SelectedValuePath="Tag"
+                              SelectedValue="{Binding SelectedMethodTag, Mode=TwoWay}"
+                              Margin="0,0,10,0" VerticalAlignment="Center"
+                              AutomationProperties.Name="Método de digitação">
+                        <ComboBoxItem Content="Automático" Tag="Automatico"/>
+                        <ComboBoxItem Content="Físico" Tag="TecladoFisico"/>
+                        <ComboBoxItem Content="Unicode" Tag="Unicode"/>
+                    </ComboBox>
+
+                    <!-- Perfil compacto -->
+                    <TextBlock Text="Perfil:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
+                    <ComboBox Width="125" SelectedValuePath="Tag"
+                              SelectedValue="{Binding SelectedProfileTag, Mode=TwoWay}"
+                              Margin="0,0,10,0" VerticalAlignment="Center"
+                              AutomationProperties.Name="Perfil de temporização">
+                        <ComboBoxItem Content="Legado" Tag="Legacy"/>
+                        <ComboBoxItem Content="Rápido" Tag="Fast"/>
+                        <ComboBoxItem Content="Compatibilidade" Tag="Compatibility"/>
+                        <ComboBoxItem Content="Natural" Tag="Natural"/>
+                        <ComboBoxItem Content="Personalizado" Tag="Custom"/>
+                    </ComboBox>
+
+                    <!-- Layout de destino compacto -->
+                    <TextBlock Text="Layout:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
+                    <ComboBox Width="135" SelectedValuePath="Tag"
+                              SelectedValue="{Binding SelectedTargetLayoutTag, Mode=TwoWay}"
+                              Margin="0,0,10,0" VerticalAlignment="Center"
+                              AutomationProperties.Name="Layout de teclado de destino">
+                        <ComboBoxItem Content="Host (Ativo)" Tag="HostForeground"/>
+                        <ComboBoxItem Content="PT-BR ABNT2" Tag="00010416"/>
+                        <ComboBoxItem Content="US-Intl" Tag="00020409"/>
+                        <ComboBoxItem Content="US" Tag="00000409"/>
+                    </ComboBox>
+
+                    <!-- §2 Ambiente (Externo / Integrado — visível somente com a flag EmbeddedBrowser) -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEmbeddedEnvironmentVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Ambiente:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
+                        <ComboBox x:Name="EnvironmentCombo" Width="155" SelectedValuePath="Tag"
+                                  SelectedValue="{Binding SelectedEnvironmentTag, Mode=TwoWay}"
+                                  SelectionChanged="EnvironmentCombo_SelectionChanged"
+                                  VerticalAlignment="Center"
+                                  AutomationProperties.Name="Ambiente de destino">
+                            <ComboBoxItem Content="Externo" Tag="External"/>
+                            <ComboBoxItem Content="Integrado (experimental)" Tag="Embedded"/>
+                        </ComboBox>
+                    </StackPanel>
+                </WrapPanel>
+            </DockPanel>
+        </Border>
 
         <!-- Conteúdo principal -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="8"/>
-                <ColumnDefinition Width="1*" MinWidth="280"/>
+                <ColumnDefinition Width="1*" MinWidth="290"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Fila de blocos de texto -->
+            <!-- §1.2 Fila de blocos de texto -->
             <DockPanel Grid.Column="0">
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" IsEnabled="{Binding CanEditQueue}">
-                    <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"/>
-                    <Button Content="REINICIAR FILA" Click="RestartQueue_Click"/>
-                    <Button Content="NOVA FILA" Click="NewQueue_Click"/>
+                    <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"
+                            AutomationProperties.Name="Adicionar bloco"/>
+                    <Button Content="REINICIAR FILA" Click="RestartQueue_Click"
+                            AutomationProperties.Name="Reiniciar fila"/>
+                    <Button Content="NOVA FILA" Click="NewQueue_Click"
+                            AutomationProperties.Name="Nova fila"/>
                 </StackPanel>
 
                 <TextBlock DockPanel.Dock="Bottom" Text="{Binding QueueSummary}"
@@ -46,7 +123,7 @@
 
                 <Border IsEnabled="{Binding CanEditQueue}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding Blocks}">
+                        <ItemsControl x:Name="QueueBlocksItemsControl" ItemsSource="{Binding Blocks}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:TextBlockItem}">
                                     <Border BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
@@ -70,7 +147,23 @@
                                                         <Setter Property="Background" Value="#FFF8E8"/>
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding Status}" Value="Sent">
-                                                        <Setter Property="Background" Value="#F1FAF3"/>
+                                                        <Setter Property="Background" Value="#F1F7FC"/>
+                                                        <Setter Property="BorderBrush" Value="#9CC2E6"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="PartiallySent">
+                                                        <Setter Property="Background" Value="#FFF5E5"/>
+                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="1.5"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Interrupted">
+                                                        <Setter Property="Background" Value="#FFF5E5"/>
+                                                        <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="1.5"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                        <Setter Property="Background" Value="#FDECEC"/>
+                                                        <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="1.5"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -82,14 +175,17 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="Bold"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding StatusLabel}" FontWeight="Bold"/>
+                                                <Border Grid.Column="1" CornerRadius="3" Padding="6,1" Background="{Binding StatusBackgroundHex}">
+                                                    <TextBlock Text="{Binding StatusLabel}" FontWeight="Bold" Foreground="{Binding StatusColorHex}"/>
+                                                </Border>
                                             </Grid>
 
                                             <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
                                                      IsReadOnly="{Binding IsTypingOrPaused}"
                                                      AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                                                      MaxHeight="140" VerticalScrollBarVisibility="Auto"
-                                                     FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"/>
+                                                     FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"
+                                                     AutomationProperties.Name="{Binding Header}"/>
 
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -103,15 +199,19 @@
                                                 </TextBlock>
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                     <Button Content="↑" Padding="8,2" MinWidth="30"
+                                                            AutomationProperties.Name="Mover bloco para cima"
                                                             Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                             CommandParameter="{Binding}"/>
                                                     <Button Content="↓" Padding="8,2" MinWidth="30"
+                                                            AutomationProperties.Name="Mover bloco para baixo"
                                                             Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                             CommandParameter="{Binding}"/>
                                                     <Button Content="Definir como próximo" Padding="8,2"
+                                                            AutomationProperties.Name="Definir bloco como próximo"
                                                             Command="{Binding DataContext.SetAsNextCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                             CommandParameter="{Binding}"/>
-                                                    <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"/>
+                                                    <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"
+                                                            AutomationProperties.Name="Remover bloco"/>
                                                 </StackPanel>
                                             </Grid>
                                         </StackPanel>
@@ -130,22 +230,35 @@
                 <TabItem Header="Status">
                     <StackPanel Margin="6">
                         <TextBlock Text="Estado:" FontWeight="Bold"/>
-                        <TextBlock Text="{Binding StateText}" FontSize="16" Margin="0,0,0,10"/>
+                        <TextBlock Text="{Binding StateText}" FontSize="16" Margin="0,0,0,8"/>
 
                         <TextBlock Text="{Binding CountdownText}" FontSize="20" FontWeight="Bold"
-                                   Foreground="{StaticResource WarnBrush}" Margin="0,0,0,10"/>
+                                   Foreground="{StaticResource WarnBrush}" Margin="0,0,0,8"/>
 
-                        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <!-- Mensagem de status com destaque amarelo/vermelho quando Warning/Error -->
+                        <Border CornerRadius="3" Padding="6" Margin="0,0,0,10">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#F8FAFC"/>
+                                    <Setter Property="BorderBrush" Value="#E2E8F0"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusSeverity}" Value="Warning">
+                                            <Setter Property="Background" Value="#FFF5E5"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusSeverity}" Value="Error">
+                                            <Setter Property="Background" Value="#FDECEC"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap"/>
+                        </Border>
 
                         <ProgressBar Minimum="0" Maximum="100" Value="{Binding PercentComplete, Mode=OneWay}" Height="18"/>
-                        <TextBlock Margin="0,4,0,0">
-                            <Run Text="{Binding TypedCharacters, Mode=OneWay}"/>
-                            <Run Text=" / "/>
-                            <Run Text="{Binding TotalCharacters, Mode=OneWay}"/>
-                            <Run Text=" caracteres ("/>
-                            <Run Text="{Binding PercentComplete, Mode=OneWay, StringFormat={}{0:0}}"/>
-                            <Run Text="%)"/>
-                        </TextBlock>
+                        <TextBlock Text="{Binding UnitsProgressSummary}" FontWeight="SemiBold" FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         <TextBlock Text="{Binding QueueProgressLabel}" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
 
                         <Grid Margin="0,10,0,0">
@@ -158,16 +271,28 @@
                                 <TextBlock Text="{Binding ElapsedText}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Caracteres/seg" FontWeight="Bold"/>
+                                <TextBlock Text="Unidades/seg (CPS)" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding CpsText}"/>
                             </StackPanel>
                         </Grid>
+
+                        <!-- Semântica de entrega atual -->
+                        <Border Margin="0,12,0,0" Padding="6" CornerRadius="3"
+                                Background="{Binding LastDeliveryBadge.BackgroundHex}"
+                                BorderBrush="{Binding LastDeliveryBadge.ColorHex}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="{Binding LastDeliveryBadge.FullLabel}" FontWeight="Bold"
+                                           Foreground="{Binding LastDeliveryBadge.ColorHex}"/>
+                                <TextBlock Text="{Binding LastDeliveryBadge.Description}" FontSize="10.5" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </TabItem>
 
                 <TabItem Header="Histórico">
                     <DockPanel Margin="6">
-                        <Button DockPanel.Dock="Bottom" Content="Limpar histórico" Command="{Binding ClearHistoryCommand}"/>
+                        <Button DockPanel.Dock="Bottom" Content="Limpar histórico" Command="{Binding ClearHistoryCommand}"
+                                AutomationProperties.Name="Limpar histórico"/>
                         <ListBox ItemsSource="{Binding History}" DisplayMemberPath="DisplayText" FontFamily="Consolas" FontSize="11"/>
                     </DockPanel>
                 </TabItem>
@@ -178,19 +303,39 @@
             </TabControl>
         </Grid>
 
-        <!-- Barra de ações -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-            <Button x:Name="DigitarButton" Command="{Binding StartCommand}" MinWidth="170" Padding="12,8" Background="{StaticResource OkBrush}" Foreground="White">
-                <StackPanel>
-                    <TextBlock Text="{Binding DigitarButtonText}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding NextBlockLabel}" FontSize="10" HorizontalAlignment="Center"/>
-                </StackPanel>
-            </Button>
-            <Button Content="{Binding PauseResumeButtonText}" Command="{Binding PauseResumeCommand}" MinWidth="130"/>
-            <Button Content="CANCELAR (ESC)" Command="{Binding CancelCommand}" MinWidth="130" Background="{StaticResource DangerBrush}" Foreground="White"/>
-        </StackPanel>
+        <!-- §1.3 Barra de execução (rodapé) -->
+        <DockPanel Grid.Row="2" Margin="0,10,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding UnitsProgressSummary}" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,10,0"/>
+                <TextBlock VerticalAlignment="Center" FontSize="11.5" Margin="0,0,10,0">
+                    <Run Text="⏱ "/>
+                    <Run Text="{Binding ElapsedText, Mode=OneWay}"/>
+                    <Run Text=" · "/>
+                    <Run Text="{Binding CpsText, Mode=OneWay}"/>
+                    <Run Text=" CPS"/>
+                </TextBlock>
+                <Button Content="Diagnóstico" Click="OpenDiagnostics_Click" Padding="8,4"
+                        AutomationProperties.Name="Abrir painel de diagnóstico"/>
+            </StackPanel>
 
-        <TextBlock Grid.Row="3" Text="Dica: pressione ESC a qualquer momento durante a digitação para cancelar imediatamente."
-                   HorizontalAlignment="Center" Margin="0,6,0,0" FontStyle="Italic" Foreground="Gray"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="DigitarButton" Command="{Binding StartCommand}" MinWidth="185" Padding="12,6"
+                        Background="{StaticResource OkBrush}" Foreground="White"
+                        AutomationProperties.Name="Digitar próximo bloco">
+                    <StackPanel>
+                        <TextBlock Text="{Binding DigitarButtonWithShortcut}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding NextBlockLabel}" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="PauseResumeButton" Content="{Binding PauseResumeButtonWithShortcut}" Command="{Binding PauseResumeCommand}"
+                        MinWidth="150" AutomationProperties.Name="Pausar ou continuar digitação"/>
+                <Button x:Name="CancelButton" Content="{Binding CancelButtonWithShortcut}" Command="{Binding CancelCommand}"
+                        MinWidth="135" Background="{StaticResource DangerBrush}" Foreground="White"
+                        AutomationProperties.Name="Cancelar digitação"/>
+            </StackPanel>
+        </DockPanel>
+
+        <TextBlock Grid.Row="3" Text="Dica: pressione ESC a qualquer momento durante a digitação para cancelar imediatamente. O status 'Enviado' indica retorno de SendInput/CDP (recebimento não verificado)."
+                   HorizontalAlignment="Center" Margin="0,6,0,0" FontStyle="Italic" Foreground="Gray" FontSize="11"/>
     </Grid>
 </Window>

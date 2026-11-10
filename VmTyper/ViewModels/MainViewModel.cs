@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using VmTyper.Helpers;
 using VmTyper.Models;
+using VmTyper.Resources;
 using VmTyper.Services;
+using InputMethod = VmTyper.Models.InputMethod;
 
 namespace VmTyper.ViewModels;
 
@@ -67,7 +69,52 @@ public sealed class MainViewModel : ObservableObject
     public Func<TargetAnchor, TargetAnchor, bool>? ConfirmTargetChanged { get; set; }
 
     private int _skippedUnits;
+    public int SkippedUnits
+    {
+        get => _skippedUnits;
+        private set
+        {
+            if (SetField(ref _skippedUnits, value))
+            {
+                OnPropertyChanged(nameof(UnitsProgressSummary));
+            }
+        }
+    }
+
     private int _failedUnits;
+    public int FailedUnits
+    {
+        get => _failedUnits;
+        private set
+        {
+            if (SetField(ref _failedUnits, value))
+            {
+                OnPropertyChanged(nameof(UnitsProgressSummary));
+            }
+        }
+    }
+
+    private string _statusSeverity = "Normal";
+    public string StatusSeverity
+    {
+        get => _statusSeverity;
+        private set => SetField(ref _statusSeverity, value);
+    }
+
+    private DeliverySemanticState _lastDeliverySemanticState = DeliverySemanticState.Unknown;
+    public DeliverySemanticState LastDeliverySemanticState
+    {
+        get => _lastDeliverySemanticState;
+        private set
+        {
+            if (SetField(ref _lastDeliverySemanticState, value))
+            {
+                OnPropertyChanged(nameof(LastDeliveryBadge));
+            }
+        }
+    }
+
+    public DeliveryVisualBadge LastDeliveryBadge => DeliverySemantics.GetBadge(LastDeliverySemanticState);
 
     public AppSettings Settings { get; private set; }
 
@@ -88,6 +135,9 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanEditQueue));
                 OnPropertyChanged(nameof(CanPause));
                 OnPropertyChanged(nameof(PauseResumeButtonText));
+                OnPropertyChanged(nameof(PauseResumeButtonWithShortcut));
+                OnPropertyChanged(nameof(TargetGuardStateText));
+                OnPropertyChanged(nameof(TargetIndicatorText));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -110,6 +160,114 @@ public sealed class MainViewModel : ObservableObject
     public bool CanEditQueue => !IsBusy;
     public bool CanPause => State is TypingState.AguardandoContagem or TypingState.Digitando or TypingState.Pausado or TypingState.PausadoDestinoPerdido;
     public string PauseResumeButtonText => State is TypingState.Pausado or TypingState.PausadoDestinoPerdido ? "CONTINUAR" : "PAUSAR";
+    public string PauseResumeButtonWithShortcut => $"{PauseResumeButtonText} ({Settings.PauseResumeHotkey})";
+    public string CancelButtonWithShortcut => "CANCELAR (ESC)";
+
+    // --- Barra de sessão (topo, §1.1 e §2) ---
+    public string TargetGuardStateText
+    {
+        get
+        {
+            if (!Settings.EnableTargetGuard) return Strings.TargetGuardOff;
+            if (State == TypingState.PausadoDestinoPerdido) return Strings.TargetGuardLost;
+            return Strings.TargetGuardMonitoring;
+        }
+    }
+
+    public string TargetIndicatorText
+    {
+        get
+        {
+            var anchor = _targetGuard.CurrentAnchor;
+            if (anchor is not null)
+            {
+                string title = string.IsNullOrWhiteSpace(anchor.Title)
+                    ? "(sem título)"
+                    : (anchor.Title.Length > 28 ? anchor.Title[..28] + "…" : anchor.Title);
+                return $"🎯 {anchor.ProcessName} — {title} [{TargetGuardStateText}]";
+            }
+
+            string expected = Settings.ValidateTargetWindow && Settings.ExpectedBrowser != ExpectedBrowser.Nenhum
+                ? $"Esperado: {Settings.ExpectedBrowser}"
+                : "Janela ativa ao iniciar";
+            return $"🎯 {expected} [{TargetGuardStateText}]";
+        }
+    }
+
+    public string SelectedMethodTag
+    {
+        get => Settings.Method.ToString();
+        set
+        {
+            if (!CanEditQueue) return;
+            var parsed = value switch
+            {
+                "TecladoFisico" => InputMethod.TecladoFisico,
+                "Unicode" => InputMethod.Unicode,
+                _ => InputMethod.Automatico
+            };
+            if (Settings.Method != parsed)
+            {
+                Settings.Method = parsed;
+                _settingsService.Save(Settings);
+                OnPropertyChanged(nameof(SelectedMethodTag));
+            }
+        }
+    }
+
+    public string SelectedProfileTag
+    {
+        get => Settings.Features.AdaptiveTiming ? Settings.TypingProfile : "Legacy";
+        set
+        {
+            if (!CanEditQueue || string.IsNullOrWhiteSpace(value)) return;
+            if (!string.Equals( value, "Legacy", StringComparison.OrdinalIgnoreCase))
+            {
+                Settings.Features.AdaptiveTiming = true;
+            }
+            Settings.TypingProfile = value;
+            _settingsService.Save(Settings);
+            OnPropertyChanged(nameof(SelectedProfileTag));
+        }
+    }
+
+    public string SelectedTargetLayoutTag
+    {
+        get => string.IsNullOrWhiteSpace(Settings.TargetLayout) ? "HostForeground" : Settings.TargetLayout;
+        set
+        {
+            if (!CanEditQueue || string.IsNullOrWhiteSpace(value)) return;
+            if (!string.Equals(Settings.TargetLayout, value, StringComparison.Ordinal))
+            {
+                Settings.TargetLayout = value;
+                _settingsService.Save(Settings);
+                OnPropertyChanged(nameof(SelectedTargetLayoutTag));
+            }
+        }
+    }
+
+    public bool IsEmbeddedEnvironmentVisible => Settings.Features.EmbeddedBrowser;
+    public bool IsCdpSubMethodVisible => Settings.Features.EmbeddedBrowser && Settings.Features.CdpInput;
+
+    public string SelectedEnvironmentTag
+    {
+        get => Settings.Features.EmbeddedBrowser && string.Equals(Settings.TargetEnvironment, "Embedded", StringComparison.OrdinalIgnoreCase)
+            ? "Embedded"
+            : "External";
+        set
+        {
+            if (!CanEditQueue || string.IsNullOrWhiteSpace(value)) return;
+            string normalized = Settings.Features.EmbeddedBrowser && string.Equals(value, "Embedded", StringComparison.OrdinalIgnoreCase)
+                ? "Embedded"
+                : "External";
+            if (!string.Equals(Settings.TargetEnvironment, normalized, StringComparison.Ordinal))
+            {
+                Settings.TargetEnvironment = normalized;
+                _settingsService.Save(Settings);
+                OnPropertyChanged(nameof(SelectedEnvironmentTag));
+            }
+        }
+    }
 
     // --- Fila ---
     public bool HasNextBlock => _queueService.Current is not null;
@@ -136,6 +294,8 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public string DigitarButtonWithShortcut => $"{DigitarButtonText} ({Settings.StartHotkey})";
+
     public string QueueSummary =>
         $"Blocos: {_queueService.TotalBlocks}   |   Enviados: {_queueService.CompletedCount}   |   Pendentes: {_queueService.PendingCount}";
 
@@ -160,15 +320,33 @@ public sealed class MainViewModel : ObservableObject
     public int TypedCharacters
     {
         get => _typedCharacters;
-        set => SetField(ref _typedCharacters, value);
+        set
+        {
+            if (SetField(ref _typedCharacters, value))
+            {
+                OnPropertyChanged(nameof(SentUnits));
+                OnPropertyChanged(nameof(UnitsProgressSummary));
+            }
+        }
     }
+
+    public int SentUnits => _typedCharacters;
 
     private int _totalCharacters;
     public int TotalCharacters
     {
         get => _totalCharacters;
-        set => SetField(ref _totalCharacters, value);
+        set
+        {
+            if (SetField(ref _totalCharacters, value))
+            {
+                OnPropertyChanged(nameof(UnitsProgressSummary));
+            }
+        }
     }
+
+    public string UnitsProgressSummary =>
+        $"Unidades: {SentUnits}/{TotalCharacters} · Enviadas: {SentUnits} · Puladas: {SkippedUnits} · Falhas: {FailedUnits}";
 
     private double _percentComplete;
     public double PercentComplete
@@ -232,6 +410,7 @@ public sealed class MainViewModel : ObservableObject
 
         LogLines = log.Lines;
         Settings = _settingsService.Load();
+        ResumeCountdownSeconds = Settings.ResumeCountdownSeconds;
 
         _queueService.PersistenceFailed += err =>
         {
@@ -298,6 +477,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasNextBlock));
         OnPropertyChanged(nameof(NextBlockLabel));
         OnPropertyChanged(nameof(DigitarButtonText));
+        OnPropertyChanged(nameof(DigitarButtonWithShortcut));
         OnPropertyChanged(nameof(QueueSummary));
         OnPropertyChanged(nameof(QueueProgressLabel));
         CommandManager.InvalidateRequerySuggested();
@@ -312,7 +492,18 @@ public sealed class MainViewModel : ObservableObject
     public void ReloadSettings()
     {
         Settings = _settingsService.Load();
+        ResumeCountdownSeconds = Settings.ResumeCountdownSeconds;
         OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(SelectedMethodTag));
+        OnPropertyChanged(nameof(SelectedProfileTag));
+        OnPropertyChanged(nameof(SelectedTargetLayoutTag));
+        OnPropertyChanged(nameof(SelectedEnvironmentTag));
+        OnPropertyChanged(nameof(IsEmbeddedEnvironmentVisible));
+        OnPropertyChanged(nameof(IsCdpSubMethodVisible));
+        OnPropertyChanged(nameof(TargetGuardStateText));
+        OnPropertyChanged(nameof(TargetIndicatorText));
+        OnPropertyChanged(nameof(DigitarButtonWithShortcut));
+        OnPropertyChanged(nameof(PauseResumeButtonWithShortcut));
         RegisterPermanentHotkeys();
     }
 
@@ -439,9 +630,12 @@ public sealed class MainViewModel : ObservableObject
             if (Settings.EnableTargetGuard || Settings.ValidateTargetWindow)
             {
                 var anchorResult = _targetGuard.TryCaptureAnchor(Settings.ValidateTargetWindow, Settings.ExpectedBrowser);
+                OnPropertyChanged(nameof(TargetIndicatorText));
                 if (!anchorResult.IsValid)
                 {
                     State = TypingState.Erro;
+                    StatusSeverity = "Error";
+                    LastDeliverySemanticState = DeliverySemanticState.Failed;
                     StatusMessage = anchorResult.ErrorMessage ?? "A janela ativa não é um destino válido.";
                     _log.Warn(StatusMessage);
                     return;
@@ -455,6 +649,8 @@ public sealed class MainViewModel : ObservableObject
             if (block is null || block.IsEmpty)
             {
                 State = TypingState.Erro;
+                StatusSeverity = "Error";
+                LastDeliverySemanticState = DeliverySemanticState.Failed;
                 StatusMessage = "O bloco selecionado ficou vazio ou foi removido antes do início.";
                 return;
             }
@@ -482,6 +678,7 @@ public sealed class MainViewModel : ObservableObject
                 if (decision == PreflightDecision.Cancel)
                 {
                     State = TypingState.Cancelado;
+                    StatusSeverity = "Warning";
                     StatusMessage = $"Envio cancelado no pré-voo ({preflight.UnsupportedCount} unidade(s) não suportada(s)).";
                     _log.Info(StatusMessage);
                     return;
@@ -493,8 +690,9 @@ public sealed class MainViewModel : ObservableObject
             {
                 TotalCharacters = preflight.TotalUnits;
             }
-            _skippedUnits = 0;
-            _failedUnits = 0;
+            SkippedUnits = 0;
+            FailedUnits = 0;
+            StatusSeverity = "Normal";
 
             _queueService.BeginTyping(blockId, sessionId);
             _activeBlockId = blockId;
@@ -527,9 +725,11 @@ public sealed class MainViewModel : ObservableObject
             double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
             if (_skippedUnits > 0 || _failedUnits > 0)
             {
-                // §2.3 (E): conclusão com Skipped > 0 ou Failed > 0 termina como PartiallySent/aviso, nunca Concluído verde.
+                // §2.3 (E) e Fase 5 §1: conclusão com Skipped > 0 ou Failed > 0 termina como PartiallySent/aviso (amarelo ou vermelho).
                 State = TypingState.Erro;
-                string warn = $"Bloco {blockOrder} enviado parcialmente ({TypedCharacters} enviadas, {_skippedUnits} puladas, {_failedUnits} falhas).";
+                StatusSeverity = _failedUnits > 0 ? "Error" : "Warning";
+                LastDeliverySemanticState = DeliverySemantics.FromLocalSendResult(UnitOutcome.Failed);
+                string warn = Strings.FormatBlockPartialSent(blockOrder, TypedCharacters, _skippedUnits, _failedUnits);
                 StatusMessage = warn;
                 _log.Warn(warn);
                 AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: false, duration);
@@ -538,21 +738,22 @@ public sealed class MainViewModel : ObservableObject
             else
             {
                 State = TypingState.Concluido;
+                StatusSeverity = "Normal";
+                bool hadFocusIncidents = _targetGuard.Incidents.Count > 0;
+                LastDeliverySemanticState = DeliverySemantics.FromLocalSendResult(UnitOutcome.Sent, hadFocusIncidents);
                 _log.Info($"Digitação concluída. Unidades enviadas: {TypedCharacters}. Duração: {duration:0.0}s");
 
                 AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: true, duration);
                 _queueService.CompleteBlock(blockId, Settings.ClearTextAfterCompletion, resumeFromIndex + TypedCharacters, sessionId);
 
-                var upcoming = _queueService.Current;
-                StatusMessage = upcoming is not null
-                    ? $"Bloco {blockOrder} enviado. Próximo: Bloco {upcoming.Order}."
-                    : "Todos os blocos foram enviados.";
+                StatusMessage = Strings.FormatBlockSent(blockOrder, TypedCharacters);
             }
         }
         catch (OperationCanceledException)
         {
             double duration = (DateTime.Now - _sessionStartedAt).TotalSeconds;
             State = TypingState.Cancelado;
+            StatusSeverity = "Warning";
             StatusMessage = $"Digitação do Bloco {blockOrder} cancelada pelo usuário.";
             _log.Info("Digitação cancelada pelo usuário.");
             AddHistoryEntry(sessionId, blockId, blockOrder, TotalCharacters, completed: false, duration);
@@ -564,6 +765,8 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             State = TypingState.Erro;
+            StatusSeverity = "Error";
+            LastDeliverySemanticState = DeliverySemanticState.Failed;
             StatusMessage = $"Erro no Bloco {blockOrder}: {ex.Message}";
             _log.Error(ex.Message);
             if (typingStarted)
@@ -574,6 +777,7 @@ public sealed class MainViewModel : ObservableObject
         finally
         {
             _targetGuard.StopMonitoring();
+            OnPropertyChanged(nameof(TargetIndicatorText));
             _activeBlockId = null;
         }
     }
@@ -590,6 +794,7 @@ public sealed class MainViewModel : ObservableObject
                 _queueService.PauseOrResumeBlock(_activeBlockId.Value);
             }
             State = TypingState.PausadoDestinoPerdido;
+            StatusSeverity = "Warning";
             StatusMessage = "Pausado: destino perdido. Volte à janela de destino e clique em CONTINUAR.";
         }
         return Task.CompletedTask;
@@ -623,8 +828,8 @@ public sealed class MainViewModel : ObservableObject
     {
         TypedCharacters = p.Sent;
         TotalCharacters = p.TotalUnits;
-        _skippedUnits = p.Skipped;
-        _failedUnits = p.Failed;
+        SkippedUnits = p.Skipped;
+        FailedUnits = p.Failed;
         PercentComplete = p.PercentComplete;
         ElapsedText = p.Elapsed.ToString(@"mm\:ss");
         CpsText = p.CharactersPerSecond.ToString("0.0");
