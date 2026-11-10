@@ -35,11 +35,39 @@ public partial class DiagnosticsWindow : Window
 
         TestTextBox.Text = DefaultTestText;
         LogListBox.ItemsSource = _log.Lines;
+        UpdateExpectedFingerprint();
 
         Closing += (_, _) =>
         {
             _activeLease?.Cancel();
         };
+    }
+
+    private void TestTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateExpectedFingerprint();
+    }
+
+    private void UpdateExpectedFingerprint()
+    {
+        if (ExpectedFingerprintText is null) return;
+        var fp = DivergenceClassifier.ComputeFingerprint(TestTextBox.Text ?? string.Empty);
+        int letters = fp.CategoryCounts.GetValueOrDefault("letra") + fp.CategoryCounts.GetValueOrDefault("acentuado");
+        int digits = fp.CategoryCounts.GetValueOrDefault("dígito");
+        int punct = fp.CategoryCounts.GetValueOrDefault("pontuação");
+        int spaces = fp.CategoryCounts.GetValueOrDefault("espaço");
+        int controls = fp.CategoryCounts.GetValueOrDefault("controle");
+        ExpectedFingerprintText.Text =
+            $"Esperado — SHA-256(12): {fp.Sha256Hex12} | len={fp.CharLength} (graf={fp.GraphemeCount}) | " +
+            $"L:{letters} D:{digits} P:{punct} S:{spaces} C:{controls}";
+    }
+
+    private void PurgeDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var engine = new TypingDiagnosticsEngine();
+        int removed = engine.PurgeAllDiagnostics();
+        StatusText.Text = $"Diagnósticos excluídos ({removed} arquivo(s)).";
+        _log.Info($"Excluídos {removed} arquivo(s) de diagnóstico JSONL.");
     }
 
     private async void SendTest_Click(object sender, RoutedEventArgs e)

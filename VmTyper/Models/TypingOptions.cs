@@ -77,4 +77,10 @@ public sealed class TypingOptions
     /// <c>TypingProfile.Legacy(CharDelayMs, EnterDelayMs)</c>.
     /// </summary>
     public TypingProfile? Profile { get; init; }
+
+    /// <summary>Quando verdadeiro, grava o JSONL da sessão via <see cref="Services.TypingDiagnosticsEngine"/> (Fase 3 §1).</summary>
+    public bool RecordJsonlDiagnostics { get; init; }
+
+    /// <summary>Quando verdadeiro, aumenta temporariamente o gap se o atraso real exceder o solicitado por sobrecarga de CPU (Fase 3 §7).</summary>
+    public bool EnableAdaptiveSlowdown { get; init; }
 }

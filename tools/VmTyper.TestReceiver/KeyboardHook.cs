@@ -12,7 +12,8 @@ public sealed record HookEvent(
     uint Scan,
     uint Flags,
     bool Extended,
-    bool Injected);
+    bool Injected,
+    bool RepeatedDownWithoutUp = false);
 
 /// <summary>
 /// Hook WH_KEYBOARD_LL: observa (sem bloquear) todos os eventos de teclado
@@ -55,6 +56,7 @@ internal sealed class KeyboardHook : IDisposable
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly object _lock = new();
     private readonly List<HookEvent> _events = new();
+    private readonly HashSet<uint> _downScans = new();
     private IntPtr _handle;
 
     public KeyboardHook()
@@ -74,7 +76,11 @@ internal sealed class KeyboardHook : IDisposable
 
     public void Clear()
     {
-        lock (_lock) _events.Clear();
+        lock (_lock)
+        {
+            _events.Clear();
+            _downScans.Clear();
+        }
     }
 
     private IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -83,16 +89,34 @@ internal sealed class KeyboardHook : IDisposable
         {
             var data = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             int msg = wParam.ToInt32();
-            var e = new HookEvent(
-                Stopwatch.GetTimestamp(),
-                _clock.Elapsed.TotalMilliseconds,
-                msg is WM_KEYUP or WM_SYSKEYUP,
-                data.vkCode,
-                data.scanCode,
-                data.flags,
-                (data.flags & LLKHF_EXTENDED) != 0,
-                (data.flags & LLKHF_INJECTED) != 0);
-            lock (_lock) _events.Add(e);
+            bool isKeyUp = msg is WM_KEYUP or WM_SYSKEYUP;
+            bool isExtended = (data.flags & LLKHF_EXTENDED) != 0;
+            uint logicalScan = (isExtended ? 0xE000u : 0u) | data.scanCode;
+
+            lock (_lock)
+            {
+                bool repeatedDown = false;
+                if (!isKeyUp)
+                {
+                    repeatedDown = !_downScans.Add(logicalScan);
+                }
+                else
+                {
+                    _downScans.Remove(logicalScan);
+                }
+
+                var e = new HookEvent(
+                    Stopwatch.GetTimestamp(),
+                    _clock.Elapsed.TotalMilliseconds,
+                    isKeyUp,
+                    data.vkCode,
+                    data.scanCode,
+                    data.flags,
+                    isExtended,
+                    (data.flags & LLKHF_INJECTED) != 0,
+                    repeatedDown);
+                _events.Add(e);
+            }
         }
         return CallNextHookEx(_handle, nCode, wParam, lParam);
     }

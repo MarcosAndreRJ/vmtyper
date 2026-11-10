@@ -100,3 +100,4 @@ Nenhuma regressão detectada; toda a suíte de 81 testes da Fase 1/1B permaneceu
 ## 7. Próxima fase
 
 - **Fase 3: Investigação e mitigação de duplicações (`docs/vmtype_2/fases/fase-3-duplicacoes.md`)** — instrumentar o alinhamento de sequência no receptor, testar as hipóteses de duplicação (hold, gap entre teclas idênticas, modificadores, autoindentação) e calibrar os perfis com base em dados medidos.
+

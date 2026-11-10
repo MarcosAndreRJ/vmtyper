@@ -79,17 +79,29 @@ internal sealed class TypingScheduler
         TypingProfile profile,
         IProgress<TypingProgress>? progress,
         PauseToken pauseToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TypingDiagnosticsEngine? diagnostics = null)
     {
         var policy = new TypingTimingPolicy(profile);
         var contexts = TypingTimingPolicy.BuildContexts(report.Units);
         var metrics = new TypingMetrics(profile.Name);
         metrics.BeginSession();
 
+        if (diagnostics is not null && (options.RecordJsonlDiagnostics || options.DiagnosticMode))
+        {
+            diagnostics.BeginSession(
+                Guid.NewGuid(),
+                options,
+                profile,
+                new FeatureFlags { AdaptiveTiming = profile.Kind != ProfileKind.Legacy, DetailedTrace = _log.DetailedTrace },
+                _log.DetailedTrace);
+        }
+
         int totalUnits = report.TotalUnits;
         int sent = 0;
         int skipped = 0;
         int failed = 0;
+        double adaptiveBackoffFactor = 1.0;
         var stopwatch = Stopwatch.StartNew();
 
         if (options.DiagnosticMode)
@@ -116,10 +128,24 @@ internal sealed class TypingScheduler
                 }
 
                 var timing = policy.Next(ctx);
+                if (options.EnableAdaptiveSlowdown && adaptiveBackoffFactor > 1.001 && timing.GapAfter > TimeSpan.Zero)
+                {
+                    double boostedMs = Math.Min(
+                        profile.Limits.MaxGapMs,
+                        timing.GapAfter.TotalMilliseconds * adaptiveBackoffFactor);
+                    timing = new KeyTiming(
+                        timing.Hold,
+                        TimeSpan.FromMilliseconds(Math.Round(boostedMs)),
+                        timing.Reason + "+AdaptiveSlowdown");
+                }
 
                 // Não cancelável dentro da unidade: garante que todo KeyDown tenha seu KeyUp.
                 var result = _executor.ExecuteUnit(unit, timing.Hold);
                 metrics.RecordUnit(unit, timing, result);
+                if (diagnostics is not null && (options.RecordJsonlDiagnostics || options.DiagnosticMode))
+                {
+                    diagnostics.RecordEvent(unit, timing, result);
+                }
 
                 switch (result.Outcome)
                 {
@@ -163,7 +189,21 @@ internal sealed class TypingScheduler
                     await _delay.WaitAsync(timing.GapAfter, cancellationToken).ConfigureAwait(false);
                     long gapEnd = _delay.Timestamp();
                     double actualGapSec = Math.Max(0.0, (double)(gapEnd - gapStart) / Stopwatch.Frequency);
-                    metrics.RecordGap(timing.GapAfter, TimeSpan.FromSeconds(actualGapSec));
+                    var actualSpan = TimeSpan.FromSeconds(actualGapSec);
+                    metrics.RecordGap(timing.GapAfter, actualSpan);
+
+                    if (options.EnableAdaptiveSlowdown)
+                    {
+                        double overshootMs = actualSpan.TotalMilliseconds - timing.GapAfter.TotalMilliseconds;
+                        if (overshootMs > 10.0)
+                        {
+                            adaptiveBackoffFactor = Math.Min(2.0, adaptiveBackoffFactor * 1.4);
+                        }
+                        else
+                        {
+                            adaptiveBackoffFactor = Math.Max(1.0, 1.0 + (adaptiveBackoffFactor - 1.0) * 0.80);
+                        }
+                    }
                 }
                 else
                 {
@@ -173,6 +213,7 @@ internal sealed class TypingScheduler
         }
         finally
         {
+            diagnostics?.EndSession();
             _executor.Tracker.ReleaseAll(_executor.Injector, _log);
         }
 

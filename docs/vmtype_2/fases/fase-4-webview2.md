@@ -10,7 +10,7 @@
 
 ## §1 PoC isolada (`experiments/WebView2Poc/`)
 Um projeto WPF separado, fora do app, para não desestabilizar o principal.
-
+<!--  -->
 1. Pacote `Microsoft.Web.WebView2` (versão estável fixada no `Directory.Packages.props`). Antes de escrever código, **consultar a documentação oficial** da versão escolhida e registrar no relatório os links e versões usados.
 2. **Inicialização:**
    - Antes de criar o controle, `CoreWebView2Environment.GetAvailableBrowserVersionString()`. Se o runtime estiver ausente, mostrar uma mensagem clara (sem instalar nada sozinho).
@@ -19,7 +19,7 @@ Um projeto WPF separado, fora do app, para não desestabilizar o principal.
 3. **Navegação:** barra de endereço, Voltar, Avançar, Atualizar, indicador de carregamento (`NavigationStarting`/`NavigationCompleted`) e erros (`WebErrorStatus` → mensagem amigável).
 4. **Página-alvo:** a página HTML de diagnóstico da F3 §2, carregada localmente (`SetVirtualHostNameToFolderMapping`).
 5. **Método A (SendInput):** focar o WebView2 (`webView.Focus()` e `CoreWebView2Controller.MoveFocus`) e usar o `TypingScheduler` existente. A página registra os eventos.
-6. **Método B (CDP):** ver §3.
+<!-- 6. **Método B (CDP):** ver §3. -->
 7. **Comparação:** o mesmo corpus pelos dois métodos → JSON exportado pela página → o classificador da F3 compara `key`/`code`/`repeat`/`isTrusted`/ordem/timestamps e o texto final.
 8. **Sessão VMware real** (somente com acesso autorizado e uma pessoa presente): repetir o passo 7 com o receptor na VM (F3 §3).
 9. Relatório `relatorios/F4-poc-webview2.md`.

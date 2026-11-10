@@ -10,6 +10,7 @@
             <RowDefinition Height="2*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="1.2*"/>
         </Grid.RowDefinitions>
 
@@ -19,25 +20,30 @@
             em "Enviar teste", aguarde a contagem regressiva e clique no campo de destino dentro da VM.
         </TextBlock>
 
-        <TextBox Grid.Row="1" x:Name="TestTextBox" AcceptsReturn="True" TextWrapping="Wrap"
-                  FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Auto"/>
+        <TextBox Grid.Row="1" x:Name="TestTextBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                  FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Auto"
+                  TextChanged="TestTextBox_TextChanged"/>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+        <TextBlock Grid.Row="2" x:Name="ExpectedFingerprintText" Margin="0,6,0,2"
+                   FontFamily="Consolas" FontSize="11.5" TextWrapping="Wrap"/>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
             <TextBlock Text="Método:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="MethodCombo" Width="220" SelectedIndex="0">
                 <ComboBoxItem Content="Automático" Tag="Automatico"/>
                 <ComboBoxItem Content="Teclado físico" Tag="TecladoFisico"/>
                 <ComboBoxItem Content="Unicode" Tag="Unicode"/>
             </ComboBox>
+            <Button Content="Excluir diagnósticos" Click="PurgeDiagnostics_Click" Margin="12,0,0,0" Padding="8,2"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
             <Button Content="Enviar teste" Click="SendTest_Click" MinWidth="120"/>
             <Button Content="Cancelar (ESC)" Click="Cancel_Click" MinWidth="120"/>
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Bold"/>
         </StackPanel>
 
-        <GroupBox Grid.Row="4" Header="Log de diagnóstico (caracteres não suportados aparecem aqui)">
+        <GroupBox Grid.Row="5" Header="Log de diagnóstico (caracteres não suportados aparecem aqui)">
             <ListBox x:Name="LogListBox" FontFamily="Consolas" FontSize="11"/>
         </GroupBox>
     </Grid>

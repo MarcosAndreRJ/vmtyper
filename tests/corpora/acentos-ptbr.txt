@@ -1,0 +1,10 @@
+Vogais com acento agudo: á é í ó ú Á É Í Ó Ú
+Vogais com crase: à è ì ò ù À È Ì Ò Ù
+Vogais com circunflexo: â ê î ô û Â Ê Î Ô Û
+Vogais com til: ã õ Ã Õ
+Vogais com trema: ä ë ï ö ü Ä Ë Ï Ö Ü
+Cedilha: ç Ç
+Palavras e frases em portugues:
+Ação, coração, pães, mães, avós, avôs, você, três, mês, saída, saúde, baú, herói, céu, chapéu.
+Às vezes a configuração exige atenção redobrada à acentuação gráfica em sessões remotas.
+ÓRGÃOS PÚBLICOS E INSTITUIÇÕES DE TRANSIÇÃO TECNOLÓGICA: ÁGUA, ÉTICA, ÍNDICE, ÓTIMO, ÚNICO.

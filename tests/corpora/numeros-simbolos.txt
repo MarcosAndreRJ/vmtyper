@@ -1,0 +1,7 @@
+Valores monetarios e numericos:
+R$ 1.250,00 | R$ 0,05 | R$ 98.765.432,10 | US$ 4,500.75 | 100% | -42.5 | +3.14159265
+Simbolos e pontuacao:
+!@#$%&*()-_=+[]{};:/?\|<>
+Combinacoes de simbolos:
+(a + b) * [c - d] / {e % f} = <g | h> & ^i ~j !k ?l :m ;n "o" 'p' \q/
+IP e portas: 192.168.0.1:8080, 10.0.0.254:443, [::1]:5000

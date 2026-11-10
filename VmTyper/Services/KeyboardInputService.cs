@@ -21,10 +21,12 @@ public sealed class KeyboardInputService : IKeyboardInputService
     private readonly InjectedKeyTracker _tracker = new();
     private readonly KeyStrokeExecutor _executor;
     private readonly TypingScheduler _scheduler;
+    private readonly TypingDiagnosticsEngine _diagnostics;
     private int _isTyping;
 
     internal InjectedKeyTracker Tracker => _tracker;
     internal KeyStrokePlanner Planner => _planner;
+    public TypingDiagnosticsEngine Diagnostics => _diagnostics;
     public SessionMetrics? LastSessionMetrics { get; private set; }
 
     internal KeyboardInputService(
@@ -32,7 +34,8 @@ public sealed class KeyboardInputService : IKeyboardInputService
         LogService log,
         IInputInjector injector,
         IKeyboardLayoutProvider layoutProvider,
-        IDelayProvider? delayProvider = null)
+        IDelayProvider? delayProvider = null,
+        TypingDiagnosticsEngine? diagnostics = null)
     {
         _mapping = mapping;
         _log = log;
@@ -42,6 +45,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
         _planner = new KeyStrokePlanner(mapping);
         _executor = new KeyStrokeExecutor(injector, mapping, _tracker, log, _delayProvider);
         _scheduler = new TypingScheduler(_planner, _executor, _delayProvider, _log);
+        _diagnostics = diagnostics ?? new TypingDiagnosticsEngine();
     }
 
     public void EmergencyReleaseTrackedKeys()
@@ -125,7 +129,8 @@ public sealed class KeyboardInputService : IKeyboardInputService
             profile,
             progress,
             pauseToken,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            _diagnostics).ConfigureAwait(false);
     }
 
     /// <summary>

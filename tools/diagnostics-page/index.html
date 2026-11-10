@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VmTyper — Página de Diagnóstico de Teclado (Nível Navegador)</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --muted: #59636e;
+      --ok: #1a7f37;
+      --warn: #9a6700;
+      --err: #cf222e;
+    }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 16px;
+    }
+    h1 { font-size: 18px; margin: 0 0 8px 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+    textarea {
+      width: 100%;
+      height: 220px;
+      box-sizing: border-box;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 14px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      resize: vertical;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #f3f4f6; }
+    .metrics {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .badge-ok { color: var(--ok); font-weight: bold; }
+    .badge-warn { color: var(--warn); font-weight: bold; }
+    .badge-err { color: var(--err); font-weight: bold; }
+    .log-box {
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      background: #1f2328;
+      color: #e6edf3;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .suspicious { color: #ff7b72; font-weight: bold; }
+    .limitations {
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>VmTyper — Página de Diagnóstico de Eventos DOM (F3 §2 / F4 PoC)</h1>
+
+  <div class="toolbar">
+    <button id="btnFocus" type="button">Focar área de texto</button>
+    <button id="btnClear" type="button">Limpar (Reset)</button>
+    <button id="btnExport" type="button">Exportar JSON</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <strong>Área de recepção (<code>#targetTextarea</code>):</strong>
+      <textarea id="targetTextarea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"
+                placeholder="Clique aqui ou use o botão 'Focar área de texto' antes de injetar teclas..."></textarea>
+    </div>
+
+    <div class="card">
+      <strong>Resumo em tempo real:</strong>
+      <div id="summaryBox" class="metrics">Aguardando eventos...</div>
+      <div style="margin-top:8px;"><strong>Eventos recentes / suspeitos:</strong></div>
+      <div id="eventLog" class="log-box"></div>
+    </div>
+  </div>
+
+  <div class="card limitations">
+    <strong>Limitações conhecidas deste nível de observabilidade (Navegador DOM):</strong>
+    <ul>
+      <li>Enxerga os eventos <code>keydown</code>, <code>keyup</code>, <code>beforeinput</code> e <code>input</code> entregues pelo navegador a este documento HTML.</li>
+      <li><strong>Não</strong> enxerga dentro de <code>&lt;iframe&gt;</code> de outra origem (cross-origin).</li>
+      <li><strong>Não</strong> enxerga o pipeline interno do console VMware HTML5 (que captura eventos num <code>&lt;canvas&gt;</code> e os transmite via WebSocket/WMKS para o hypervisor).</li>
+      <li><strong>Não substitui</strong> o receptor nativo executado dentro da VM convidada (<code>VmTyper.TestReceiver</code>, F3 §3).</li>
+    </ul>
+  </div>
+
+  <script>
+    (function () {
+      const textarea = document.getElementById('targetTextarea');
+      const summaryBox = document.getElementById('summaryBox');
+      const eventLog = document.getElementById('eventLog');
+
+      let events = [];
+      let pressedCodes = new Set();
+      let suspiciousCount = 0;
+
+      // Implementação síncrona de SHA-256 (UTF-8) para funcionar tanto em file:// quanto via WebView2 ExecuteScriptAsync.
+      function sha256Hex12(asciiOrUtf8Text) {
+        const msgBuffer = new TextEncoder().encode(asciiOrUtf8Text);
+        const K = [
+          0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+          0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+          0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+          0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+          0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+          0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+          0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+          0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ];
+        let H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+        const l = msgBuffer.length;
+        const bitLen = l * 8;
+        const padLen = ((l + 8) >> 6 << 4) + 16;
+        const words = new Int32Array(padLen);
+        for (let i = 0; i < l; i++) {
+          words[i >> 2] |= msgBuffer[i] << (24 - (i & 3) * 8);
+        }
+        words[l >> 2] |= 0x80 << (24 - (l & 3) * 8);
+        words[padLen - 1] = bitLen;
+
+        const W = new Int32Array(64);
+        const rotr = (n, x) => (x >>> n) | (x << (32 - n));
+        for (let i = 0; i < padLen; i += 16) {
+          for (let t = 0; t < 16; t++) W[t] = words[i + t];
+          for (let t = 16; t < 64; t++) {
+            const s0 = rotr(7, W[t - 15]) ^ rotr(18, W[t - 15]) ^ (W[t - 15] >>> 3);
+            const s1 = rotr(17, W[t - 2]) ^ rotr(19, W[t - 2]) ^ (W[t - 2] >>> 10);
+            W[t] = (W[t - 16] + s0 + W[t - 7] + s1) | 0;
+          }
+          let [a, b, c, d, e, f, g, h] = H;
+          for (let t = 0; t < 64; t++) {
+            const S1 = rotr(6, e) ^ rotr(11, e) ^ rotr(25, e);
+            const ch = (e & f) ^ (~e & g);
+            const temp1 = (h + S1 + ch + K[t] + W[t]) | 0;
+            const S0 = rotr(2, a) ^ rotr(13, a) ^ rotr(22, a);
+            const maj = (a & b) ^ (a & c) ^ (b & c);
+            const temp2 = (S0 + maj) | 0;
+            h = g; g = f; f = e; e = (d + temp1) | 0;
+            d = c; c = b; b = a; a = (temp1 + temp2) | 0;
+          }
+          H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+          H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+        }
+        return H.slice(0, 2).map(x => (x >>> 0).toString(16).padStart(8, '0')).join('').slice(0, 12);
+      }
+
+      function categorizeChar(ch) {
+        if (ch === '\n' || ch === '\r' || ch === '\t') return 'Controle';
+        if (ch === ' ') return 'Espaço';
+        if (ch >= '0' && ch <= '9') return 'Dígito';
+        const code = ch.codePointAt(0);
+        if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) return 'Letra';
+        if (/\p{L}/u.test(ch)) return 'Acentuado';
+        return 'Pontuação';
+      }
+
+      function computeCategoryCounts(text) {
+        const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const counts = { Letra: 0, Acentuado: 0, 'Dígito': 0, 'Espaço': 0, 'Pontuação': 0, Controle: 0 };
+        const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+          ? new Intl.Segmenter('pt-BR', { granularity: 'grapheme' })
+          : null;
+        const units = segmenter
+          ? Array.from(segmenter.segment(normalized), s => s.segment)
+          : Array.from(normalized);
+        for (const u of units) {
+          const cat = categorizeChar(u);
+          counts[cat] = (counts[cat] || 0) + 1;
+        }
+        return { normalized, graphemeCount: units.length, counts };
+      }
+
+      function recordKeyEvent(type, e) {
+        let suspicious = false;
+        let suspiciousReason = null;
+        const codeId = e.code || ('vk_' + e.keyCode);
+
+        if (type === 'keydown') {
+          if (e.repeat) {
+            suspicious = true;
+            suspiciousReason = 'repeat=true';
+          } else if (pressedCodes.has(codeId)) {
+            suspicious = true;
+            suspiciousReason = 'double-keydown-without-keyup';
+          }
+          pressedCodes.add(codeId);
+        } else if (type === 'keyup') {
+          pressedCodes.delete(codeId);
+        }
+
+        if (suspicious) suspiciousCount++;
+
+        const rec = {
+          index: events.length,
+          type: type,
+          key: e.key,
+          code: e.code,
+          keyCode: e.keyCode,
+          location: e.location,
+          repeat: !!e.repeat,
+          isTrusted: !!e.isTrusted,
+          shift: !!e.shiftKey,
+          ctrl: !!e.ctrlKey,
+          alt: !!e.altKey,
+          meta: !!e.metaKey,
+          timeStampMs: Number(performance.now().toFixed(3)),
+          suspicious: suspicious,
+          suspiciousReason: suspiciousReason
+        };
+        events.push(rec);
+
+        if (suspicious || events.length <= 40 || type === 'keydown') {
+          const line = document.createElement('div');
+          if (suspicious) line.className = 'suspicious';
+          line.textContent = `#${rec.index} [${rec.type}] key="${rec.key}" code="${rec.code}" trusted=${rec.isTrusted} repeat=${rec.repeat}` +
+            (suspicious ? ` [SUSPEITO: ${suspiciousReason}]` : '');
+          eventLog.appendChild(line);
+          while (eventLog.childNodes.length > 80) {
+            eventLog.removeChild(eventLog.firstChild);
+          }
+          eventLog.scrollTop = eventLog.scrollHeight;
+        }
+
+        updateSummary();
+      }
+
+      function recordInputEvent(type, e) {
+        events.push({
+          index: events.length,
+          type: type,
+          inputType: e.inputType || null,
+          data: e.data || null,
+          isComposing: !!e.isComposing,
+          isTrusted: !!e.isTrusted,
+          timeStampMs: Number(performance.now().toFixed(3)),
+          suspicious: false,
+          suspiciousReason: null
+        });
+        updateSummary();
+      }
+
+      function buildReport() {
+        const rawText = textarea.value;
+        const { normalized, graphemeCount, counts } = computeCategoryCounts(rawText);
+        const hash12 = sha256Hex12(normalized);
+        return {
+          exportedAtUtc: new Date().toISOString(),
+          text: normalized,
+          charLength: normalized.length,
+          graphemeCount: graphemeCount,
+          sha256Hex12: hash12,
+          categoryCounts: counts,
+          totalEvents: events.length,
+          suspiciousCount: suspiciousCount,
+          hasFocus: document.hasFocus(),
+          activeElementId: document.activeElement ? document.activeElement.id : null,
+          events: events
+        };
+      }
+
+      function updateSummary() {
+        const r = buildReport();
+        const c = r.categoryCounts;
+        summaryBox.innerHTML =
+          `<div>Comprimento: <strong>${r.charLength}</strong> chars / <strong>${r.graphemeCount}</strong> graphemes</div>` +
+          `<div>SHA-256 (12 hex): <code>${r.sha256Hex12}</code></div>` +
+          `<div>Categorias: Letra=${c.Letra} | Acentuado=${c.Acentuado} | Dígito=${c['Dígito']} | Espaço=${c['Espaço']} | Pontuação=${c['Pontuação']} | Controle=${c.Controle}</div>` +
+          `<div>Eventos DOM capturados: <strong>${r.totalEvents}</strong></div>` +
+          `<div>Eventos suspeitos (repeat / Down duplo): <span class="${r.suspiciousCount > 0 ? 'badge-err' : 'badge-ok'}">${r.suspiciousCount}</span></div>` +
+          `<div>Foco documento: <strong>${r.hasFocus}</strong> | Elemento ativo: <code>${r.activeElementId || 'nenhum'}</code></div>`;
+      }
+
+      function clearAll() {
+        textarea.value = '';
+        events = [];
+        pressedCodes.clear();
+        suspiciousCount = 0;
+        eventLog.innerHTML = '';
+        updateSummary();
+        textarea.focus();
+      }
+
+      textarea.addEventListener('keydown', e => recordKeyEvent('keydown', e));
+      textarea.addEventListener('keyup', e => recordKeyEvent('keyup', e));
+      textarea.addEventListener('beforeinput', e => recordInputEvent('beforeinput', e));
+      textarea.addEventListener('input', e => recordInputEvent('input', e));
+      window.addEventListener('focus', updateSummary);
+      window.addEventListener('blur', updateSummary);
+
+      document.getElementById('btnFocus').addEventListener('click', () => textarea.focus());
+      document.getElementById('btnClear').addEventListener('click', clearAll);
+      document.getElementById('btnExport').addEventListener('click', () => {
+        const json = JSON.stringify(buildReport(), null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `vmtyper-diag-browser-${Date.now()}.json`;
+        a.click();
+      });
+
+      window.__vmtyperDiag = {
+        getReport: buildReport,
+        clear: clearAll,
+        focusTarget: function () {
+          textarea.focus();
+          return document.activeElement === textarea;
+        }
+      };
+
+      updateSummary();
+    })();
+  </body>
+</html>
