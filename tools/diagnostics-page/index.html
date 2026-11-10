@@ -124,7 +124,13 @@
   </div>
 
   <script>
+    window.onerror = function (msg, url, line, col, err) {
+      window.__lastErr = msg + ' (' + line + ':' + col + ')';
+    };
+  </script>
+  <script>
     (function () {
+      try {
       const textarea = document.getElementById('targetTextarea');
       const summaryBox = document.getElementById('summaryBox');
       const eventLog = document.getElementById('eventLog');
@@ -319,7 +325,17 @@
         textarea.focus();
       }
 
-      textarea.addEventListener('keydown', e => recordKeyEvent('keydown', e));
+      textarea.addEventListener('keydown', e => {
+        recordKeyEvent('keydown', e);
+        if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          textarea.value = textarea.value.slice(0, start) + '\t' + textarea.value.slice(end);
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+          updateSummary();
+        }
+      });
       textarea.addEventListener('keyup', e => recordKeyEvent('keyup', e));
       textarea.addEventListener('beforeinput', e => recordInputEvent('beforeinput', e));
       textarea.addEventListener('input', e => recordInputEvent('input', e));
@@ -347,6 +363,10 @@
       };
 
       updateSummary();
+      } catch (e) {
+        window.__lastErr = String(e && e.stack || e);
+      }
     })();
-  </body>
+  </script>
+</body>
 </html>

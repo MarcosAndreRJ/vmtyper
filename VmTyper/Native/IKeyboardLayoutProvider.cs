@@ -28,9 +28,10 @@ internal sealed class Win32KeyboardLayoutProvider : IKeyboardLayoutProvider
     public IntPtr GetLayout()
     {
         IntPtr hwnd = Win32.GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return IntPtr.Zero;
+        if (hwnd == IntPtr.Zero) return Win32.GetKeyboardLayout(0);
         uint threadId = Win32.GetWindowThreadProcessId(hwnd, out _);
-        return Win32.GetKeyboardLayout(threadId);
+        IntPtr hkl = Win32.GetKeyboardLayout(threadId);
+        return hkl != IntPtr.Zero ? hkl : Win32.GetKeyboardLayout(0);
     }
 
     public IntPtr LoadLayout(string klid)
