@@ -123,3 +123,4 @@ Abaixo está o checklist de conformidade com todos os requisitos estipulados no 
 - [x] **Sem perda silenciosa na persistência:** garantido por `AtomicJsonStore` e envelopes v2 testados em `PersistenceTests.cs`.
 - [x] **Documentação reflete o comportamento real:** `README.md`, `ARCHITECTURE.md`, `TESTING.md` e `DISTRIBUTION.md` alinhados ao código em produção.
 - [x] **Enviado ≠ Confirmado em todos os resultados:** semântica rigorosa implementada na UI principal, na fila de blocos e nos relatórios de progresso.
+

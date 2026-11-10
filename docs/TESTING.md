@@ -86,3 +86,4 @@ Quando novos ambientes VMware ou consoles HTML5 forem atualizados, execute o seg
    - Compare o texto digitado na VM com o texto original do VmTyper.
    - Verifique se houve caracteres duplicados ou omitidos.
    - Caso haja falhas, registre o log técnico gerado na pasta de logs (`%AppData%\VmTyper\logs\`).
+

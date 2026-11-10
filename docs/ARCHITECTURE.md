@@ -215,3 +215,4 @@ O VmTyper implementa a distinção rigorosa **Enviado ≠ Confirmado**:
 - Toda conclusão de bloco pela janela principal exibe:
   `"Bloco N: X unidades enviadas. Recebimento não verificado."`
   Caso haja unidades puladas ou com falha, o status do bloco transita para `PartiallySent`.
+

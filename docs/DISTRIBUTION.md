@@ -43,3 +43,4 @@ O VmTyper segue as diretrizes da Microsoft para armazenamento de configurações
 
 ### 3.2 Perfil de Navegador Embutido (`%LocalAppData%\VmTyper\`)
 - `WebView2Profile\`: cache e dados de sessão do runtime do WebView2 quando o modo de navegador integrado estiver ativo.
+
