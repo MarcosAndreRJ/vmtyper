@@ -146,25 +146,33 @@ public sealed class TextBlockItem : ObservableObject
     public DeliverySemanticState DeliveryState => DeliverySemantics.FromBlockStatus(Status);
 
     [JsonIgnore]
-    public string StatusIcon => Status switch
-    {
-        TextBlockStatus.Sent => "↗",
-        TextBlockStatus.Typing => "⌨",
-        TextBlockStatus.Paused => "⏸",
-        TextBlockStatus.PartiallySent => "◐",
-        TextBlockStatus.Failed => "✗",
-        TextBlockStatus.Interrupted => "⚠",
-        TextBlockStatus.Empty => "○",
-        TextBlockStatus.Ready when IsNext => "▶",
-        TextBlockStatus.Ready => "●",
-        _ => "•"
-    };
+    public string StatusIcon => (Status == TextBlockStatus.Empty || IsEmpty)
+        ? "○"
+        : Status switch
+        {
+            TextBlockStatus.Sent => "↗",
+            TextBlockStatus.Typing => "⌨",
+            TextBlockStatus.Paused => "⏸",
+            TextBlockStatus.PartiallySent => "◐",
+            TextBlockStatus.Failed => "✗",
+            TextBlockStatus.Interrupted => "⚠",
+            TextBlockStatus.Cancelled when IsNext => "▶",
+            TextBlockStatus.Cancelled => "⚠",
+            TextBlockStatus.Ready when IsNext => "▶",
+            TextBlockStatus.Ready => "●",
+            _ => "•"
+        };
 
     [JsonIgnore]
     public string StatusText
     {
         get
         {
+            if (Status == TextBlockStatus.Empty || IsEmpty)
+            {
+                return string.IsNullOrEmpty(PersistenceNote) ? "Vazio" : $"Vazio ({PersistenceNote})";
+            }
+
             string baseText = Status switch
             {
                 TextBlockStatus.Sent => "Enviado",
@@ -175,7 +183,7 @@ public sealed class TextBlockItem : ObservableObject
                     : $"Parcial ({SentUpToIndex})",
                 TextBlockStatus.Failed => "Falha",
                 TextBlockStatus.Interrupted => "Interrompido",
-                TextBlockStatus.Empty => string.IsNullOrEmpty(PersistenceNote) ? "Vazio" : $"Vazio ({PersistenceNote})",
+                TextBlockStatus.Cancelled => "Cancelado",
                 TextBlockStatus.Ready when IsNext => "Próximo ▶",
                 TextBlockStatus.Ready => "Pronto",
                 _ => Status.ToString()
@@ -191,26 +199,34 @@ public sealed class TextBlockItem : ObservableObject
     }
 
     [JsonIgnore]
-    public string StatusColorHex => Status switch
-    {
-        TextBlockStatus.Sent => "#1E6BB8",
-        TextBlockStatus.Typing or TextBlockStatus.Paused or TextBlockStatus.Interrupted => "#B86B11",
-        TextBlockStatus.PartiallySent => "#B86B11",
-        TextBlockStatus.Failed => "#B82E2E",
-        TextBlockStatus.Ready when IsNext => "#1F7A3E",
-        TextBlockStatus.Ready => "#333333",
-        _ => "#777777"
-    };
+    public string StatusColorHex => (Status == TextBlockStatus.Empty || IsEmpty)
+        ? "#777777"
+        : Status switch
+        {
+            TextBlockStatus.Sent => "#1E6BB8",
+            TextBlockStatus.Typing or TextBlockStatus.Paused or TextBlockStatus.Interrupted => "#B86B11",
+            TextBlockStatus.PartiallySent => "#B86B11",
+            TextBlockStatus.Failed => "#B82E2E",
+            TextBlockStatus.Cancelled when IsNext => "#1F7A3E",
+            TextBlockStatus.Cancelled => "#B86B11",
+            TextBlockStatus.Ready when IsNext => "#1F7A3E",
+            TextBlockStatus.Ready => "#333333",
+            _ => "#777777"
+        };
 
     [JsonIgnore]
-    public string StatusBackgroundHex => Status switch
-    {
-        TextBlockStatus.Sent => "#F1F7FC",
-        TextBlockStatus.Typing or TextBlockStatus.Paused => "#FFF8E8",
-        TextBlockStatus.PartiallySent or TextBlockStatus.Interrupted => "#FFF5E5",
-        TextBlockStatus.Failed => "#FDECEC",
-        _ => "#FFFFFF"
-    };
+    public string StatusBackgroundHex => (Status == TextBlockStatus.Empty || IsEmpty)
+        ? "#FFFFFF"
+        : Status switch
+        {
+            TextBlockStatus.Sent => "#F1F7FC",
+            TextBlockStatus.Typing or TextBlockStatus.Paused => "#FFF8E8",
+            TextBlockStatus.PartiallySent or TextBlockStatus.Interrupted => "#FFF5E5",
+            TextBlockStatus.Failed => "#FDECEC",
+            TextBlockStatus.Cancelled when IsNext => "#F4FBF6",
+            TextBlockStatus.Ready when IsNext => "#F4FBF6",
+            _ => "#FFFFFF"
+        };
 
     [JsonIgnore]
     public string StatusLabel => $"{StatusIcon} {StatusText}";

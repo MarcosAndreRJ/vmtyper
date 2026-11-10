@@ -319,7 +319,7 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="DigitarButton" Command="{Binding StartCommand}" MinWidth="185" Padding="12,6"
+                <Button x:Name="DigitarButton" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" MinWidth="185" Padding="12,6"
                         Background="{StaticResource OkBrush}" Foreground="White"
                         AutomationProperties.Name="Digitar próximo bloco">
                     <StackPanel>

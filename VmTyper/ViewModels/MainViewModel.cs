@@ -133,6 +133,7 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(StateText));
                 OnPropertyChanged(nameof(IsBusy));
                 OnPropertyChanged(nameof(CanEditQueue));
+                OnPropertyChanged(nameof(CanStart));
                 OnPropertyChanged(nameof(CanPause));
                 OnPropertyChanged(nameof(PauseResumeButtonText));
                 OnPropertyChanged(nameof(PauseResumeButtonWithShortcut));
@@ -271,6 +272,7 @@ public sealed class MainViewModel : ObservableObject
 
     // --- Fila ---
     public bool HasNextBlock => _queueService.Current is not null;
+    public bool CanStart => !IsBusy && HasNextBlock;
 
     public string NextBlockLabel
     {
@@ -475,12 +477,17 @@ public sealed class MainViewModel : ObservableObject
     private void OnQueueChanged()
     {
         OnPropertyChanged(nameof(HasNextBlock));
+        OnPropertyChanged(nameof(CanStart));
         OnPropertyChanged(nameof(NextBlockLabel));
         OnPropertyChanged(nameof(DigitarButtonText));
         OnPropertyChanged(nameof(DigitarButtonWithShortcut));
         OnPropertyChanged(nameof(QueueSummary));
         OnPropertyChanged(nameof(QueueProgressLabel));
-        CommandManager.InvalidateRequerySuggested();
+
+        (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (SetAsNextCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (MoveUpCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (MoveDownCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     // --- Ações de edição da fila expostas para o code-behind (que cuida das confirmações via MessageBox) ---

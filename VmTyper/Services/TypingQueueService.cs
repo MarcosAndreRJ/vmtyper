@@ -24,6 +24,7 @@ public sealed class TypingQueueService
     private readonly IAutoSaveScheduler _autoSaveTimer;
 
     private bool _suppressPropertyCallback;
+    private bool _isRecalculating;
     private readonly Dictionary<Guid, string> _lockedTextSnapshot = new();
 
     public ObservableCollection<TextBlockItem> Blocks { get; } = new();
@@ -87,16 +88,16 @@ public sealed class TypingQueueService
 
     private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_suppressPropertyCallback || sender is not TextBlockItem block) return;
+        if (_suppressPropertyCallback || _isRecalculating || sender is not TextBlockItem block) return;
 
         if (e.PropertyName == nameof(TextBlockItem.Text))
         {
-            if (block.Status is TextBlockStatus.Typing or TextBlockStatus.Paused)
+            if (IsLocked || block.Status is TextBlockStatus.Typing or TextBlockStatus.Paused)
             {
-                // Edição bloqueada durante Typing/Paused: reverte ao texto salvo.
+                // Edição bloqueada durante Typing/Paused ou fila travada: reverte ao texto salvo.
                 if (_lockedTextSnapshot.TryGetValue(block.Id, out var original) && block.Text != original)
                 {
-                    _log.Warn($"Edição bloqueada no Bloco {block.Order} (estado {block.Status}).");
+                    _log.Warn($"Edição bloqueada no Bloco {block.Order} (fila travada / estado {block.Status}).");
                     _suppressPropertyCallback = true;
                     try { block.Text = original; }
                     finally { _suppressPropertyCallback = false; }
@@ -140,206 +141,217 @@ public sealed class TypingQueueService
         Guid? sessionId = null,
         bool clearTextOnSent = false)
     {
-        var block = Find(id);
-        if (block is null) return false;
-
-        if (sentUpToIndex.HasValue) block.SentUpToIndex = sentUpToIndex.Value;
-        if (sessionId.HasValue) block.LastSessionId = sessionId.Value;
-
-        var from = block.Status;
-        bool wasSentEdited = false;
-
-        switch (from)
+        if (_isRecalculating) return false;
+        _isRecalculating = true;
+        try
         {
-            case TextBlockStatus.Empty:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.TextEdited:
-                        if (!block.IsEmpty) block.Status = TextBlockStatus.Ready;
-                        break;
-                    case BlockTransitionEvent.Restart:
-                        block.Status = TextBlockStatus.Empty;
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+            var block = Find(id);
+            if (block is null) return false;
 
-            case TextBlockStatus.Ready:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.TextEdited:
-                        if (block.IsEmpty) block.Status = TextBlockStatus.Empty;
-                        break;
-                    case BlockTransitionEvent.BeginTyping:
-                        if (block.IsEmpty) return false;
-                        _lockedTextSnapshot[block.Id] = block.Text;
-                        block.Status = TextBlockStatus.Typing;
-                        block.LastError = null;
-                        break;
-                    case BlockTransitionEvent.SetAsNext:
-                        ManualNextId = block.Id;
-                        break;
-                    case BlockTransitionEvent.Restart:
-                        block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+            if (sentUpToIndex.HasValue) block.SentUpToIndex = sentUpToIndex.Value;
+            if (sessionId.HasValue) block.LastSessionId = sessionId.Value;
 
-            case TextBlockStatus.Typing:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.PauseOrResume:
-                        block.Status = TextBlockStatus.Paused;
-                        break;
-                    case BlockTransitionEvent.AllSent:
-                        block.Status = TextBlockStatus.Sent;
-                        block.SentUpToIndex = block.Text.Length;
-                        block.LastError = null;
-                        if (ManualNextId == block.Id) ManualNextId = null;
-                        if (clearTextOnSent)
-                        {
-                            _suppressPropertyCallback = true;
-                            try { block.Text = string.Empty; }
-                            finally { _suppressPropertyCallback = false; }
-                        }
-                        break;
-                    case BlockTransitionEvent.Cancel:
-                        if (block.SentUpToIndex > 0)
-                        {
-                            block.Status = TextBlockStatus.PartiallySent;
+            var from = block.Status;
+            bool wasSentEdited = false;
+
+            switch (from)
+            {
+                case TextBlockStatus.Empty:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            if (!block.IsEmpty) block.Status = TextBlockStatus.Ready;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.Status = TextBlockStatus.Empty;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Ready:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            if (block.IsEmpty) block.Status = TextBlockStatus.Empty;
+                            break;
+                        case BlockTransitionEvent.BeginTyping:
+                            if (block.IsEmpty) return false;
+                            _lockedTextSnapshot[block.Id] = block.Text;
+                            block.Status = TextBlockStatus.Typing;
+                            block.LastError = null;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
                             ManualNextId = block.Id;
-                        }
-                        else
-                        {
-                            block.Status = TextBlockStatus.Cancelled;
+                            break;
+                        case BlockTransitionEvent.Restart:
                             block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        }
-                        break;
-                    case BlockTransitionEvent.Fail:
-                        block.LastError = error;
-                        if (block.SentUpToIndex > 0)
-                        {
-                            block.Status = TextBlockStatus.PartiallySent;
-                        }
-                        else
-                        {
-                            block.Status = TextBlockStatus.Failed;
-                        }
-                        ManualNextId = block.Id;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
 
-            case TextBlockStatus.Paused:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.PauseOrResume:
-                        block.Status = TextBlockStatus.Typing;
-                        break;
-                    case BlockTransitionEvent.Cancel:
-                        if (block.SentUpToIndex > 0)
-                        {
-                            block.Status = TextBlockStatus.PartiallySent;
+                case TextBlockStatus.Typing:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.PauseOrResume:
+                            block.Status = TextBlockStatus.Paused;
+                            break;
+                        case BlockTransitionEvent.AllSent:
+                            block.Status = TextBlockStatus.Sent;
+                            block.SentUpToIndex = block.Text.Length;
+                            block.LastError = null;
+                            if (ManualNextId == block.Id) ManualNextId = null;
+                            if (clearTextOnSent)
+                            {
+                                _suppressPropertyCallback = true;
+                                try { block.Text = string.Empty; }
+                                finally { _suppressPropertyCallback = false; }
+                            }
+                            break;
+                        case BlockTransitionEvent.Cancel:
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                                ManualNextId = block.Id;
+                            }
+                            else
+                            {
+                                block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                                ManualNextId = block.Id;
+                            }
+                            break;
+                        case BlockTransitionEvent.Fail:
+                            block.LastError = error;
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                            }
+                            else
+                            {
+                                block.Status = TextBlockStatus.Failed;
+                            }
                             ManualNextId = block.Id;
-                        }
-                        else
-                        {
-                            block.Status = TextBlockStatus.Cancelled;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Paused:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.PauseOrResume:
+                            block.Status = TextBlockStatus.Typing;
+                            break;
+                        case BlockTransitionEvent.Cancel:
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                                ManualNextId = block.Id;
+                            }
+                            else
+                            {
+                                block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                                ManualNextId = block.Id;
+                            }
+                            break;
+                        case BlockTransitionEvent.Fail:
+                            block.LastError = error;
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                            }
+                            else
+                            {
+                                block.Status = TextBlockStatus.Failed;
+                            }
+                            ManualNextId = block.Id;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Sent:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
                             block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        }
-                        break;
-                    case BlockTransitionEvent.Fail:
-                        block.LastError = error;
-                        if (block.SentUpToIndex > 0)
-                        {
-                            block.Status = TextBlockStatus.PartiallySent;
-                        }
-                        else
-                        {
-                            block.Status = TextBlockStatus.Failed;
-                        }
-                        ManualNextId = block.Id;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+                            wasSentEdited = !block.IsEmpty;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = TextBlockStatus.Ready;
+                            ManualNextId = block.Id;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
 
-            case TextBlockStatus.Sent:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.TextEdited:
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        wasSentEdited = !block.IsEmpty;
-                        break;
-                    case BlockTransitionEvent.SetAsNext:
-                        if (block.IsEmpty) return false;
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        block.Status = TextBlockStatus.Ready;
-                        ManualNextId = block.Id;
-                        break;
-                    case BlockTransitionEvent.Restart:
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+                case TextBlockStatus.Cancelled:
+                case TextBlockStatus.PartiallySent:
+                case TextBlockStatus.Interrupted:
+                case TextBlockStatus.Failed:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        case BlockTransitionEvent.BeginTyping:
+                            if (block.IsEmpty) return false;
+                            _lockedTextSnapshot[block.Id] = block.Text;
+                            block.Status = TextBlockStatus.Typing;
+                            block.LastError = null;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
+                            ManualNextId = block.Id;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
 
-            case TextBlockStatus.PartiallySent:
-            case TextBlockStatus.Interrupted:
-            case TextBlockStatus.Failed:
-                switch (evt)
-                {
-                    case BlockTransitionEvent.TextEdited:
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        break;
-                    case BlockTransitionEvent.BeginTyping:
-                        if (block.IsEmpty) return false;
-                        _lockedTextSnapshot[block.Id] = block.Text;
-                        block.Status = TextBlockStatus.Typing;
-                        block.LastError = null;
-                        break;
-                    case BlockTransitionEvent.SetAsNext:
-                        if (block.IsEmpty) return false;
-                        ManualNextId = block.Id;
-                        break;
-                    case BlockTransitionEvent.Restart:
-                        block.SentUpToIndex = 0;
-                        block.LastError = null;
-                        block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
-                        break;
-                    default:
-                        return false;
-                }
-                break;
+                default:
+                    return false;
+            }
 
-            default:
-                return false;
+            RecalculateNext();
+            if (wasSentEdited)
+            {
+                SentBlockEdited?.Invoke(block);
+            }
+            return true;
         }
-
-        RecalculateNext();
-        if (wasSentEdited)
+        finally
         {
-            SentBlockEdited?.Invoke(block);
+            _isRecalculating = false;
         }
-        return true;
     }
 
     // ------------------------------------------------------------------
@@ -548,7 +560,7 @@ public sealed class TypingQueueService
         }
         else if (block.Status == TextBlockStatus.Cancelled)
         {
-            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+            if (block.IsEmpty) block.Status = TextBlockStatus.Empty;
         }
         else if (block.Status == TextBlockStatus.Ready && block.IsEmpty)
         {
@@ -582,40 +594,49 @@ public sealed class TypingQueueService
         RecalculateNext();
     }
 
-    private static bool IsManualNextEligible(TextBlockItem block) =>
+    public static bool IsBlockEligible(TextBlockItem block) =>
         !block.IsEmpty && block.Status is
             TextBlockStatus.Ready or
+            TextBlockStatus.Cancelled or
             TextBlockStatus.PartiallySent or
             TextBlockStatus.Interrupted or
             TextBlockStatus.Failed;
 
     /// <summary>
     /// Calcula <see cref="NextBlockId"/> e atualiza <see cref="TextBlockItem.IsNext"/>:
-    /// 1. Se houver um bloco em Typing/Paused, nenhum outro é "próximo" ativo, ou mantém o ponteiro calculado.
-    /// 2. Se <see cref="ManualNextId"/> aponta para um bloco elegível (Ready/PartiallySent/Interrupted/Failed), ele é o próximo.
-    /// 3. Caso contrário, é o primeiro bloco em <see cref="TextBlockStatus.Ready"/> na ordem.
+    /// 1. Se houver um bloco em Typing/Paused, ele permanece como o bloco ativo.
+    /// 2. Se <see cref="ManualNextId"/> aponta para um bloco elegível, respeita a seleção manual.
+    /// 3. Caso contrário, seleciona o primeiro bloco elegível na ordem da fila.
     /// </summary>
     private void RecalculateNext()
     {
         Guid? resolved = null;
 
-        if (ManualNextId.HasValue)
+        var activeTyping = Blocks.FirstOrDefault(b => b.Status is TextBlockStatus.Typing or TextBlockStatus.Paused);
+        if (activeTyping is not null)
         {
-            var manual = Find(ManualNextId.Value);
-            if (manual is not null && IsManualNextEligible(manual))
-            {
-                resolved = manual.Id;
-            }
-            else if (manual is null || manual.Status is not (TextBlockStatus.Typing or TextBlockStatus.Paused))
-            {
-                ManualNextId = null;
-            }
+            resolved = activeTyping.Id;
         }
-
-        if (resolved is null)
+        else
         {
-            var firstReady = Blocks.FirstOrDefault(b => b.Status == TextBlockStatus.Ready && !b.IsEmpty);
-            resolved = firstReady?.Id;
+            if (ManualNextId.HasValue)
+            {
+                var manual = Find(ManualNextId.Value);
+                if (manual is not null && IsBlockEligible(manual))
+                {
+                    resolved = manual.Id;
+                }
+                else
+                {
+                    ManualNextId = null;
+                }
+            }
+
+            if (resolved is null)
+            {
+                var firstEligible = Blocks.FirstOrDefault(b => IsBlockEligible(b));
+                resolved = firstEligible?.Id;
+            }
         }
 
         NextBlockId = resolved;
