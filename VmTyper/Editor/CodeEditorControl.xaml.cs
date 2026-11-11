@@ -62,17 +62,90 @@ public partial class CodeEditorControl : WpfUserControl
     {
         InitializeComponent();
 
-        TextEditor.Options.HighlightCurrentLine = true;
-        TextEditor.Options.EnableHyperlinks = false;
-        TextEditor.Options.ConvertTabsToSpaces = false;
+        try
+        {
+            TextEditor.Options.HighlightCurrentLine = true;
+            TextEditor.Options.EnableHyperlinks = false;
+            TextEditor.Options.ConvertTabsToSpaces = false;
 
-        _searchPanel = SearchPanel.Install(TextEditor);
+            _searchPanel = SearchPanel.Install(TextEditor);
 
-        TextEditor.TextChanged += TextEditor_TextChanged;
-        TextEditor.TextArea.Caret.PositionChanged += Caret_PositionChanged;
-        TextEditor.TextArea.SelectionChanged += TextArea_SelectionChanged;
+            TextEditor.TextChanged += TextEditor_TextChanged;
+            TextEditor.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+            TextEditor.TextArea.SelectionChanged += TextArea_SelectionChanged;
 
-        UpdateSyntaxHighlighting();
+            Services.ThemeManager.Instance.ThemeChanged += ThemeManager_ThemeChanged;
+            Loaded += (_, _) => UpdateEditorTheme();
+            Unloaded += (_, _) => Services.ThemeManager.Instance.ThemeChanged -= ThemeManager_ThemeChanged;
+
+            UpdateSyntaxHighlighting();
+            UpdateEditorTheme();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CodeEditorControl] Erro na inicialização: {ex}");
+        }
+    }
+
+    private void ThemeManager_ThemeChanged(object? sender, bool isDark)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            UpdateSyntaxHighlighting();
+            UpdateEditorTheme();
+        });
+    }
+
+    public void UpdateEditorTheme()
+    {
+        try
+        {
+            System.Windows.Media.Brush? Find(string key) => TryFindResource(key) as System.Windows.Media.Brush;
+
+            if (Find("EditorBackgroundBrush") is { } bg)
+            {
+                TextEditor.Background = bg;
+            }
+            if (Find("EditorForegroundBrush") is { } fg)
+            {
+                TextEditor.Foreground = fg;
+            }
+            if (Find("EditorLineNumberBrush") is { } lnb)
+            {
+                TextEditor.LineNumbersForeground = lnb;
+            }
+            if (Find("EditorSelectionBrush") is { } sel)
+            {
+                TextEditor.TextArea.SelectionBrush = sel;
+                TextEditor.TextArea.SelectionBorder = null;
+                TextEditor.TextArea.SelectionForeground = null; // mantém a cor da sintaxe sobre a seleção
+            }
+            if (Find("EditorCaretBrush") is { } caret)
+            {
+                TextEditor.TextArea.Caret.CaretBrush = caret;
+            }
+            if (Find("EditorCurrentLineBrush") is { } cur)
+            {
+                var view = TextEditor.TextArea.TextView;
+                view.CurrentLineBackground = cur;
+                view.CurrentLineBorder = Find("EditorCurrentLineBorderBrush") is { } curBorder
+                    ? new System.Windows.Media.Pen(curBorder, 1)
+                    : null;
+            }
+
+            // Painel de busca (Ctrl+F): acompanha as superfícies e o marcador de resultados do tema.
+            if (_searchPanel != null)
+            {
+                if (Find("SurfaceElevatedBrush") is { } panelBg) _searchPanel.Background = panelBg;
+                if (Find("TextPrimaryBrush") is { } panelFg) _searchPanel.Foreground = panelFg;
+                if (Find("BorderBrush") is { } panelBorder) _searchPanel.BorderBrush = panelBorder;
+                if (Find("EditorMarkerBrush") is { } marker) _searchPanel.MarkerBrush = marker;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CodeEditorControl] Erro ao atualizar tema do editor: {ex}");
+        }
     }
 
     private static void OnTextChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -118,7 +191,7 @@ public partial class CodeEditorControl : WpfUserControl
     {
         string sel = TextEditor.SelectedText ?? string.Empty;
         SelectedText = sel;
-        SelectionInfoText.Text = sel.Length > 0 ? $"{sel.Length} carac. selecionados" : "0 carac. selecionados";
+        SelectionInfoText.Text = sel.Length > 0 ? $"{sel.Length:N0} caracteres selecionados" : "Nada selecionado";
     }
 
     public void UpdateSyntaxHighlighting()
@@ -135,6 +208,26 @@ public partial class CodeEditorControl : WpfUserControl
         }
     }
 
+    public void ScrollToAndSelect(int startOffset, int endOffset, int startLine)
+    {
+        try
+        {
+            if (TextEditor.Document != null)
+            {
+                int maxOffset = TextEditor.Document.TextLength;
+                int start = Math.Clamp(startOffset, 0, maxOffset);
+                int end = Math.Clamp(endOffset, start, maxOffset);
+                TextEditor.ScrollTo(Math.Max(1, startLine), 1);
+                TextEditor.Select(start, Math.Max(0, end - start));
+                TextEditor.Focus();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CodeEditorControl] Erro ao selecionar bloco: {ex.Message}");
+        }
+    }
+
     public void ScrollToLine(int line)
     {
         if (line > 0 && line <= TextEditor.LineCount)
@@ -143,58 +236,97 @@ public partial class CodeEditorControl : WpfUserControl
         }
     }
 
-    private void Undo_Click(object sender, RoutedEventArgs e)
+    // --- API pública usada pela barra de ferramentas e atalhos da janela principal ---------------------
+    public bool CanUndo => TextEditor.CanUndo;
+    public bool CanRedo => TextEditor.CanRedo;
+    public int LineCount => TextEditor.LineCount;
+
+    public void Undo()
     {
         if (TextEditor.CanUndo) TextEditor.Undo();
     }
 
-    private void Redo_Click(object sender, RoutedEventArgs e)
+    public void Redo()
     {
         if (TextEditor.CanRedo) TextEditor.Redo();
     }
 
-    private void Search_Click(object sender, RoutedEventArgs e)
+    public void OpenSearch()
     {
         _searchPanel?.Open();
+        TextEditor.Focus();
     }
 
-    private void GoToLine_Click(object sender, RoutedEventArgs e)
+    public void FocusEditor() => TextEditor.Focus();
+
+    /// <summary>Move o cursor para o início da linha informada (1-based, limitada ao documento).</summary>
+    public void GoToLine(int line)
+    {
+        if (TextEditor.Document == null || TextEditor.LineCount == 0) return;
+        int target = Math.Clamp(line, 1, TextEditor.LineCount);
+        var docLine = TextEditor.Document.GetLineByNumber(target);
+        TextEditor.CaretOffset = docLine.Offset;
+        TextEditor.ScrollToLine(target);
+        TextEditor.Focus();
+    }
+
+    /// <summary>Abre o diálogo "Ir para linha" (herda tema e estilos do sistema de design).</summary>
+    public void ShowGoToLineDialog()
     {
         var window = new Window
         {
             Title = "Ir para linha",
-            Width = 300,
-            Height = 140,
+            Width = 320,
+            SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = Window.GetWindow(this),
-            ResizeMode = ResizeMode.NoResize
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false
         };
+        window.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "SurfaceBrush");
+        window.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimaryBrush");
 
-        var sp = new System.Windows.Controls.StackPanel { Margin = new Thickness(12) };
-        sp.Children.Add(new System.Windows.Controls.TextBlock { Text = "Número da linha:", Margin = new Thickness(0, 0, 0, 6) });
+        var sp = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
+        sp.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = $"Número da linha (1 a {TextEditor.LineCount}):",
+            Margin = new Thickness(0, 0, 0, 8)
+        });
         var tb = new System.Windows.Controls.TextBox { Text = TextEditor.TextArea.Caret.Line.ToString() };
         sp.Children.Add(tb);
 
-        var btn = new System.Windows.Controls.Button
+        var buttons = new System.Windows.Controls.StackPanel
         {
-            Content = "Ir",
-            Width = 70,
-            Margin = new Thickness(0, 8, 0, 0),
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-            IsDefault = true
+            Margin = new Thickness(0, 12, 0, 0)
         };
-        btn.Click += (_, _) =>
+        var ok = new System.Windows.Controls.Button { Content = "Ir", MinWidth = 72, IsDefault = true };
+        ok.Style = (Style)System.Windows.Application.Current.FindResource("PrimaryButtonStyle");
+        var cancel = new System.Windows.Controls.Button { Content = "Cancelar", MinWidth = 72, IsCancel = true };
+        ok.Click += (_, _) =>
         {
             if (int.TryParse(tb.Text, out int targetLine))
             {
-                ScrollToLine(targetLine);
-                window.Close();
+                GoToLine(targetLine);
+                window.DialogResult = true;
+            }
+            else
+            {
+                tb.SelectAll();
+                tb.Focus();
             }
         };
-        sp.Children.Add(btn);
+        buttons.Children.Add(ok);
+        buttons.Children.Add(cancel);
+        sp.Children.Add(buttons);
         window.Content = sp;
+        window.Loaded += (_, _) => { tb.Focus(); tb.SelectAll(); };
         window.ShowDialog();
     }
+
+    public void ZoomIn() => ZoomIn_Click(this, new RoutedEventArgs());
+    public void ZoomOut() => ZoomOut_Click(this, new RoutedEventArgs());
 
     private void ZoomIn_Click(object sender, RoutedEventArgs e)
     {

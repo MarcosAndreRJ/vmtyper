@@ -443,3 +443,4 @@ public static class DelphiCodeSplitter
         return count;
     }
 }
+

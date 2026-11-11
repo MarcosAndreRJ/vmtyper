@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <!-- Tokens de design independentes de tema: tipografia, espaçamento, raios e alturas. -->
+
+    <!-- Famílias de fonte -->
+    <FontFamily x:Key="UiFontFamily">Segoe UI</FontFamily>
+    <FontFamily x:Key="EditorFontFamily">Cascadia Code, Consolas, Courier New</FontFamily>
+    <FontFamily x:Key="IconFontFamily">Segoe MDL2 Assets</FontFamily>
+
+    <!-- Hierarquia tipográfica (mínimo de 12 px para texto de interface) -->
+    <sys:Double x:Key="FontSizeTitle">18</sys:Double>
+    <sys:Double x:Key="FontSizePanelTitle">14</sys:Double>
+    <sys:Double x:Key="FontSizeAction">13</sys:Double>
+    <sys:Double x:Key="FontSizeBody">13</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
+    <sys:Double x:Key="FontSizeStat">20</sys:Double>
+    <sys:Double x:Key="FontSizeIcon">14</sys:Double>
+    <sys:Double x:Key="FontSizeIconSmall">11</sys:Double>
+
+    <!-- Escala de espaçamento (4 px) -->
+    <sys:Double x:Key="Space1">4</sys:Double>
+    <sys:Double x:Key="Space2">8</sys:Double>
+    <sys:Double x:Key="Space3">12</sys:Double>
+    <sys:Double x:Key="Space4">16</sys:Double>
+    <Thickness x:Key="PadPanel">12</Thickness>
+    <Thickness x:Key="PadControl">12,6</Thickness>
+    <Thickness x:Key="PadCompact">8,4</Thickness>
+    <Thickness x:Key="GapRegion">8</Thickness>
+
+    <!-- Raios e alturas -->
+    <CornerRadius x:Key="RadiusSm">4</CornerRadius>
+    <CornerRadius x:Key="RadiusMd">6</CornerRadius>
+    <CornerRadius x:Key="RadiusLg">8</CornerRadius>
+    <sys:Double x:Key="ControlHeight">32</sys:Double>
+    <sys:Double x:Key="ControlHeightLarge">44</sys:Double>
+</ResourceDictionary>

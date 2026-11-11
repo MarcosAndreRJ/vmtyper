@@ -1,0 +1,178 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="Delphi.Dark" extensions=".pas;.dpr;.inc" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#6A9955" exampleText="// comment" />
+  <Color name="String" foreground="#CE9178" exampleText="'Hello World'" />
+  <Color name="Directive" foreground="#C586C0" fontStyle="italic" exampleText="{$IFDEF DEBUG}" />
+  <Color name="Keywords" foreground="#569CD6" fontWeight="bold" exampleText="begin" />
+  <Color name="Types" foreground="#4EC9B0" fontWeight="bold" exampleText="Integer" />
+  <Color name="Numbers" foreground="#B5CEA8" exampleText="1234" />
+
+  <RuleSet>
+    <!-- Comentários -->
+    <Span color="Comment" begin="//" />
+    <Span color="Comment" multiline="true" begin="\{" end="\}" />
+    <Span color="Comment" multiline="true" begin="\(\*" end="\*\)" />
+
+    <!-- Diretivas de compilação {$...} -->
+    <Span color="Directive" multiline="true" begin="\{\$" end="\}" />
+
+    <!-- Strings '...' com suporte a '' de escape -->
+    <Span color="String">
+      <Begin>'</Begin>
+      <End>'</End>
+      <RuleSet>
+        <Span begin="''" end="" />
+      </RuleSet>
+    </Span>
+
+    <!-- Números hexadecimais ($FF) e decimais -->
+    <Rule color="Numbers">
+      \$[0-9a-fA-F]+|[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?
+    </Rule>
+
+    <!-- Palavras-chave essenciais do Delphi -->
+    <Keywords color="Keywords">
+      <Word>and</Word>
+      <Word>array</Word>
+      <Word>as</Word>
+      <Word>asm</Word>
+      <Word>begin</Word>
+      <Word>case</Word>
+      <Word>class</Word>
+      <Word>const</Word>
+      <Word>constructor</Word>
+      <Word>destructor</Word>
+      <Word>dispinterface</Word>
+      <Word>div</Word>
+      <Word>do</Word>
+      <Word>downto</Word>
+      <Word>else</Word>
+      <Word>end</Word>
+      <Word>except</Word>
+      <Word>exports</Word>
+      <Word>file</Word>
+      <Word>finalization</Word>
+      <Word>finally</Word>
+      <Word>for</Word>
+      <Word>function</Word>
+      <Word>goto</Word>
+      <Word>if</Word>
+      <Word>implementation</Word>
+      <Word>in</Word>
+      <Word>inherited</Word>
+      <Word>initialization</Word>
+      <Word>inline</Word>
+      <Word>interface</Word>
+      <Word>is</Word>
+      <Word>label</Word>
+      <Word>library</Word>
+      <Word>mod</Word>
+      <Word>nil</Word>
+      <Word>not</Word>
+      <Word>object</Word>
+      <Word>of</Word>
+      <Word>or</Word>
+      <Word>out</Word>
+      <Word>packed</Word>
+      <Word>procedure</Word>
+      <Word>program</Word>
+      <Word>property</Word>
+      <Word>raise</Word>
+      <Word>record</Word>
+      <Word>repeat</Word>
+      <Word>resourcestring</Word>
+      <Word>set</Word>
+      <Word>shl</Word>
+      <Word>shr</Word>
+      <Word>string</Word>
+      <Word>then</Word>
+      <Word>threadvar</Word>
+      <Word>to</Word>
+      <Word>try</Word>
+      <Word>type</Word>
+      <Word>unit</Word>
+      <Word>until</Word>
+      <Word>uses</Word>
+      <Word>var</Word>
+      <Word>while</Word>
+      <Word>with</Word>
+      <Word>xor</Word>
+      <!-- Diretivas e modificadores -->
+      <Word>absolute</Word>
+      <Word>abstract</Word>
+      <Word>assembler</Word>
+      <Word>cdecl</Word>
+      <Word>default</Word>
+      <Word>dispid</Word>
+      <Word>dynamic</Word>
+      <Word>export</Word>
+      <Word>external</Word>
+      <Word>far</Word>
+      <Word>forward</Word>
+      <Word>message</Word>
+      <Word>name</Word>
+      <Word>near</Word>
+      <Word>nodefault</Word>
+      <Word>overload</Word>
+      <Word>override</Word>
+      <Word>pascal</Word>
+      <Word>private</Word>
+      <Word>protected</Word>
+      <Word>public</Word>
+      <Word>published</Word>
+      <Word>read</Word>
+      <Word>readonly</Word>
+      <Word>register</Word>
+      <Word>reintroduce</Word>
+      <Word>resident</Word>
+      <Word>safecall</Word>
+      <Word>stdcall</Word>
+      <Word>stored</Word>
+      <Word>varargs</Word>
+      <Word>virtual</Word>
+      <Word>write</Word>
+      <Word>writeonly</Word>
+      <Word>strict</Word>
+    </Keywords>
+
+    <!-- Tipos comuns -->
+    <Keywords color="Types">
+      <Word>Integer</Word>
+      <Word>Cardinal</Word>
+      <Word>ShortInt</Word>
+      <Word>SmallInt</Word>
+      <Word>LongInt</Word>
+      <Word>Int64</Word>
+      <Word>UInt64</Word>
+      <Word>Byte</Word>
+      <Word>Word</Word>
+      <Word>LongWord</Word>
+      <Word>Boolean</Word>
+      <Word>ByteBool</Word>
+      <Word>WordBool</Word>
+      <Word>LongBool</Word>
+      <Word>Char</Word>
+      <Word>AnsiChar</Word>
+      <Word>WideChar</Word>
+      <Word>String</Word>
+      <Word>AnsiString</Word>
+      <Word>WideString</Word>
+      <Word>UnicodeString</Word>
+      <Word>ShortString</Word>
+      <Word>Single</Word>
+      <Word>Double</Word>
+      <Word>Extended</Word>
+      <Word>Comp</Word>
+      <Word>Currency</Word>
+      <Word>Real</Word>
+      <Word>Pointer</Word>
+      <Word>TObject</Word>
+      <Word>TClass</Word>
+      <Word>Variant</Word>
+      <Word>OleVariant</Word>
+      <Word>TDateTime</Word>
+      <Word>TDate</Word>
+      <Word>TTime</Word>
+    </Keywords>
+  </RuleSet>
+</SyntaxDefinition>

@@ -335,6 +335,9 @@ public partial class SettingsWindow : Window
 
         _settingsService.Save(validation.Settings);
 
+        // Aplica imediatamente o tema selecionado
+        ThemeManager.Instance.ApplyTheme(validation.Settings.Theme);
+
         if (System.Windows.Application.Current is App && App.LogServiceInstance is not null)
         {
             App.LogServiceInstance.DetailedTrace = validation.Settings.Features.DetailedTrace;

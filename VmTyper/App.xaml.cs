@@ -22,15 +22,15 @@ public partial class App : System.Windows.Application
     private TrayIconService? _trayIconService;
     private MainViewModel? _mainViewModel;
 
-    public static MainViewModel MainViewModelInstance => ((App)Current)._mainViewModel!;
-    public static LogService LogServiceInstance => ((App)Current)._logService!;
-    public static SettingsService SettingsServiceInstance => ((App)Current)._settingsService!;
-    public static ActiveWindowService ActiveWindowServiceInstance => ((App)Current)._activeWindowService!;
-    public static GlobalHotkeyService HotkeyServiceInstance => ((App)Current)._hotkeyService!;
-    public static TypingSessionCoordinator CoordinatorInstance => ((App)Current)._coordinator!;
-    public static IKeyboardInputService TypingServiceInstance => ((App)Current)._typingService!;
-    public static TrayIconService TrayIconServiceInstance => ((App)Current)._trayIconService!;
-    public static string? QueueLoadCorruptPath => ((App)Current)._queuePersistenceService?.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } r
+    public static MainViewModel MainViewModelInstance => ((Current as App)?._mainViewModel)!;
+    public static LogService LogServiceInstance => ((Current as App)?._logService)!;
+    public static SettingsService SettingsServiceInstance => ((Current as App)?._settingsService)!;
+    public static ActiveWindowService ActiveWindowServiceInstance => ((Current as App)?._activeWindowService)!;
+    public static GlobalHotkeyService HotkeyServiceInstance => ((Current as App)?._hotkeyService)!;
+    public static TypingSessionCoordinator CoordinatorInstance => ((Current as App)?._coordinator)!;
+    public static IKeyboardInputService TypingServiceInstance => ((Current as App)?._typingService)!;
+    public static TrayIconService TrayIconServiceInstance => ((Current as App)?._trayIconService)!;
+    public static string? QueueLoadCorruptPath => (Current as App)?._queuePersistenceService?.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } r
         ? r.PreservedCorruptPath
         : null;
 
@@ -43,6 +43,10 @@ public partial class App : System.Windows.Application
         _logService = new LogService(Dispatcher.CurrentDispatcher);
         _settingsService = new SettingsService();
         var initialSettings = _settingsService.Load();
+
+        // Aplica o tema configurado (Auto, Light, Dark)
+        ThemeManager.Instance.ApplyTheme(initialSettings.Theme, force: true);
+
         _logService.DetailedTrace = false;
         _historyService = new HistoryService();
         _queuePersistenceService = new QueuePersistenceService(() =>
@@ -92,7 +96,8 @@ public partial class App : System.Windows.Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        _logService?.Error("Exceção não tratada: " + e.Exception.Message);
+        _logService?.Error($"Exceção não tratada na UI: {e.Exception.GetType().Name} - {e.Exception.Message}\n{e.Exception.StackTrace}");
+        System.Diagnostics.Debug.WriteLine($"[DispatcherUnhandledException] {e.Exception}");
         // §2.2 item 6: último recurso baseado no InjectedKeyTracker (nunca solta modificadores por VK às cegas).
         if (_typingService is KeyboardInputService kis)
         {

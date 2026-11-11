@@ -135,7 +135,7 @@ public sealed class TargetGuardTests : IDisposable
         settings.Save(new AppSettings
         {
             CountdownSeconds = 0,
-            CharDelayMs = 0,
+            CharDelayMs = 20,
             EnableTargetGuard = true,
             ValidateTargetWindow = false
         });
@@ -170,6 +170,12 @@ public sealed class TargetGuardTests : IDisposable
         };
 
         var sessionTask = vm.StartAsync();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (vm.State == TypingState.Digitando && sw.ElapsedMilliseconds < 2000)
+        {
+            await Task.Delay(10);
+        }
 
         // A sessão deve estar pausada por perda de destino exatamente antes da unidade 2 ('C').
         Assert.Equal(TypingState.PausadoDestinoPerdido, vm.State);

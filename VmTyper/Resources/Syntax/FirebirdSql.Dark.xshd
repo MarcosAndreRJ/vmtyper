@@ -1,0 +1,185 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="FirebirdSql.Dark" extensions=".sql;.ddl" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#6A9955" exampleText="-- comment" />
+  <Color name="String" foreground="#CE9178" exampleText="'Hello World'" />
+  <Color name="Keywords" foreground="#569CD6" fontWeight="bold" exampleText="SELECT" />
+  <Color name="DataTypes" foreground="#4EC9B0" fontWeight="bold" exampleText="VARCHAR" />
+  <Color name="Functions" foreground="#DCDCAA" exampleText="COALESCE" />
+  <Color name="Numbers" foreground="#B5CEA8" exampleText="1234" />
+  <Color name="Terminator" foreground="#C586C0" fontWeight="bold" exampleText="SET TERM" />
+
+  <RuleSet ignoreCase="true">
+    <!-- Comentários de linha e bloco -->
+    <Span color="Comment" begin="--" />
+    <Span color="Comment" multiline="true" begin="/\*" end="\*/" />
+
+    <!-- Strings de literais -->
+    <Span color="String">
+      <Begin>'</Begin>
+      <End>'</End>
+      <RuleSet>
+        <Span begin="''" end="" />
+      </RuleSet>
+    </Span>
+
+    <!-- SET TERM especial do Firebird -->
+    <Span color="Terminator">
+      <Begin>SET\s+TERM</Begin>
+      <End>$</End>
+    </Span>
+
+    <!-- Números hexadecimais e decimais -->
+    <Rule color="Numbers">
+      [0-9]+(\.[0-9]+)?
+    </Rule>
+
+    <!-- Palavras-chave DML / DDL e PSQL do Firebird -->
+    <Keywords color="Keywords">
+      <Word>SELECT</Word>
+      <Word>INSERT</Word>
+      <Word>UPDATE</Word>
+      <Word>DELETE</Word>
+      <Word>MERGE</Word>
+      <Word>FROM</Word>
+      <Word>WHERE</Word>
+      <Word>JOIN</Word>
+      <Word>INNER</Word>
+      <Word>LEFT</Word>
+      <Word>RIGHT</Word>
+      <Word>FULL</Word>
+      <Word>OUTER</Word>
+      <Word>CROSS</Word>
+      <Word>ON</Word>
+      <Word>AND</Word>
+      <Word>OR</Word>
+      <Word>NOT</Word>
+      <Word>IN</Word>
+      <Word>IS</Word>
+      <Word>NULL</Word>
+      <Word>LIKE</Word>
+      <Word>STARTING</Word>
+      <Word>CONTAINING</Word>
+      <Word>BETWEEN</Word>
+      <Word>EXISTS</Word>
+      <Word>GROUP</Word>
+      <Word>BY</Word>
+      <Word>HAVING</Word>
+      <Word>ORDER</Word>
+      <Word>ASC</Word>
+      <Word>DESC</Word>
+      <Word>UNION</Word>
+      <Word>ALL</Word>
+      <Word>DISTINCT</Word>
+      <Word>FIRST</Word>
+      <Word>SKIP</Word>
+      <Word>ROWS</Word>
+      <Word>TO</Word>
+      <Word>AS</Word>
+      <Word>CASE</Word>
+      <Word>WHEN</Word>
+      <Word>THEN</Word>
+      <Word>ELSE</Word>
+      <Word>END</Word>
+      <Word>CREATE</Word>
+      <Word>ALTER</Word>
+      <Word>DROP</Word>
+      <Word>RECREATE</Word>
+      <Word>TABLE</Word>
+      <Word>VIEW</Word>
+      <Word>PROCEDURE</Word>
+      <Word>FUNCTION</Word>
+      <Word>TRIGGER</Word>
+      <Word>PACKAGE</Word>
+      <Word>GENERATOR</Word>
+      <Word>SEQUENCE</Word>
+      <Word>EXCEPTION</Word>
+      <Word>INDEX</Word>
+      <Word>DOMAIN</Word>
+      <Word>ROLE</Word>
+      <Word>USER</Word>
+      <Word>PRIMARY</Word>
+      <Word>KEY</Word>
+      <Word>FOREIGN</Word>
+      <Word>REFERENCES</Word>
+      <Word>CONSTRAINT</Word>
+      <Word>CHECK</Word>
+      <Word>UNIQUE</Word>
+      <Word>DEFAULT</Word>
+      <!-- PSQL -->
+      <Word>BEGIN</Word>
+      <Word>DECLARE</Word>
+      <Word>VARIABLE</Word>
+      <Word>EXECUTE</Word>
+      <Word>STATEMENT</Word>
+      <Word>INTO</Word>
+      <Word>FOR</Word>
+      <Word>DO</Word>
+      <Word>WHILE</Word>
+      <Word>IF</Word>
+      <Word>LEAVE</Word>
+      <Word>SUSPEND</Word>
+      <Word>EXIT</Word>
+      <Word>WHEN</Word>
+      <Word>POST_EVENT</Word>
+      <Word>RETURNS</Word>
+      <Word>ACTIVE</Word>
+      <Word>INACTIVE</Word>
+      <Word>BEFORE</Word>
+      <Word>AFTER</Word>
+      <Word>COMMIT</Word>
+      <Word>ROLLBACK</Word>
+      <Word>TRANSACTION</Word>
+      <Word>SET</Word>
+      <Word>TERM</Word>
+    </Keywords>
+
+    <!-- Funções embutidas -->
+    <Keywords color="Functions">
+      <Word>COALESCE</Word>
+      <Word>NULLIF</Word>
+      <Word>CAST</Word>
+      <Word>GEN_ID</Word>
+      <Word>NEXT</Word>
+      <Word>VALUE</Word>
+      <Word>SUBSTRING</Word>
+      <Word>TRIM</Word>
+      <Word>UPPER</Word>
+      <Word>LOWER</Word>
+      <Word>COUNT</Word>
+      <Word>SUM</Word>
+      <Word>AVG</Word>
+      <Word>MIN</Word>
+      <Word>MAX</Word>
+      <Word>EXTRACT</Word>
+      <Word>DATEADD</Word>
+      <Word>DATEDIFF</Word>
+      <Word>CURRENT_DATE</Word>
+      <Word>CURRENT_TIME</Word>
+      <Word>CURRENT_TIMESTAMP</Word>
+    </Keywords>
+
+    <!-- Tipos de dados Firebird -->
+    <Keywords color="DataTypes">
+      <Word>INTEGER</Word>
+      <Word>SMALLINT</Word>
+      <Word>BIGINT</Word>
+      <Word>INT128</Word>
+      <Word>FLOAT</Word>
+      <Word>DOUBLE</Word>
+      <Word>PRECISION</Word>
+      <Word>DECIMAL</Word>
+      <Word>NUMERIC</Word>
+      <Word>CHAR</Word>
+      <Word>CHARACTER</Word>
+      <Word>VARCHAR</Word>
+      <Word>BLOB</Word>
+      <Word>SUB_TYPE</Word>
+      <Word>SEGMENT</Word>
+      <Word>SIZE</Word>
+      <Word>DATE</Word>
+      <Word>TIME</Word>
+      <Word>TIMESTAMP</Word>
+      <Word>BOOLEAN</Word>
+    </Keywords>
+  </RuleSet>
+</SyntaxDefinition>

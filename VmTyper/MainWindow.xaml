@@ -4,381 +4,755 @@
         xmlns:helpers="clr-namespace:VmTyper.Helpers"
         xmlns:models="clr-namespace:VmTyper.Models"
         xmlns:editor="clr-namespace:VmTyper.Editor"
+        xmlns:services="clr-namespace:VmTyper.Services"
         Title="VmTyper — Digitação automatizada para VM via navegador"
-        Width="1120" Height="740" MinWidth="900" MinHeight="600"
+        Style="{StaticResource AppWindowStyle}"
+        x:Name="Root"
+        Width="1240" Height="780" MinWidth="880" MinHeight="560"
         WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown"
         StateChanged="Window_StateChanged"
         Closing="Window_Closing">
-    <Grid Margin="10">
+    <Window.Resources>
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <!-- Corpo clicável da aba de documento (sem moldura própria; o contêiner desenha o estado) -->
+        <Style x:Key="TabBodyButtonStyle" TargetType="Button">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" BorderThickness="1" BorderBrush="Transparent" CornerRadius="4">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Botão fechar da aba -->
+        <Style x:Key="TabCloseButtonStyle" TargetType="Button">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" BorderThickness="1" BorderBrush="Transparent" CornerRadius="4">
+                            <TextBlock Text="&#xE711;" FontFamily="{DynamicResource IconFontFamily}" FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerBackgroundBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Chip alternável (resumo do motor na barra superior) -->
+        <Style x:Key="ChipToggleStyle" TargetType="ToggleButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}"
+                                BorderThickness="1" CornerRadius="6" Padding="10,5">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Item do navegador de estrutura -->
+        <Style x:Key="StructureItemStyle" TargetType="ListBoxItem">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" BorderThickness="1" BorderBrush="Transparent" CornerRadius="6">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Separador vertical da barra de ferramentas -->
+        <Style x:Key="ToolbarDividerStyle" TargetType="Border">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Margin" Value="4,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+        </Style>
+
+        <!-- Modo compacto (janela estreita / DPI alto): rótulos secundários somem, os ícones e tooltips permanecem -->
+        <Style x:Key="CompactHideStyle" TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCompact, ElementName=Root}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactHideBorderStyle" TargetType="Border">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCompact, ElementName=Root}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Rótulo pequeno de campo (acima de combos) -->
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="Margin" Value="0,10,0,4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="LayoutRoot" Background="{DynamicResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- §1.1 Barra de sessão (topo) -->
-        <Border Grid.Row="0" Background="#F5F7FA" BorderBrush="#D8DEE9" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,8">
-            <DockPanel LastChildFill="True">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" IsEnabled="{Binding CanEditQueue}">
-                    <Button Content="Diagnóstico" Click="OpenDiagnostics_Click"
-                            AutomationProperties.Name="Diagnóstico"/>
-                    <Button Content="Configurações" Click="OpenSettings_Click"
-                            AutomationProperties.Name="Configurações"/>
+        <!-- ============================ 1. BARRA SUPERIOR COMPACTA ============================ -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="40"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Marca -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="30" Height="30" CornerRadius="8" Background="{DynamicResource AccentFillBrush}">
+                        <TextBlock Text="&#xE765;" FontFamily="{DynamicResource IconFontFamily}" FontSize="15"
+                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="VmTyper" FontSize="18" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <WrapPanel VerticalAlignment="Center" IsEnabled="{Binding CanEditQueue}">
-                    <TextBlock Text="VmTyper" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-
-                    <!-- Indicador do destino (ícone + processo + título truncado + estado do guard) -->
-                    <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="3" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                        <TextBlock x:Name="TargetIndicatorLabel"
-                                   Text="{Binding TargetIndicatorText}"
-                                   FontWeight="SemiBold" FontSize="11.5"
-                                   ToolTip="Destino monitorado pelo TargetGuard (Monitorando / Perdido / Desligado)"/>
-                    </Border>
-
-                    <!-- Método compacto -->
-                    <TextBlock Text="Método:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
-                    <ComboBox Width="118" SelectedValuePath="Tag"
-                              SelectedValue="{Binding SelectedMethodTag, Mode=TwoWay}"
-                              Margin="0,0,10,0" VerticalAlignment="Center"
-                              AutomationProperties.Name="Método de digitação">
-                        <ComboBoxItem Content="Automático" Tag="Automatico"/>
-                        <ComboBoxItem Content="Físico" Tag="TecladoFisico"/>
-                        <ComboBoxItem Content="Unicode" Tag="Unicode"/>
-                    </ComboBox>
-
-                    <!-- Perfil compacto -->
-                    <TextBlock Text="Perfil:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
-                    <ComboBox Width="125" SelectedValuePath="Tag"
-                              SelectedValue="{Binding SelectedProfileTag, Mode=TwoWay}"
-                              Margin="0,0,10,0" VerticalAlignment="Center"
-                              AutomationProperties.Name="Perfil de temporização">
-                        <ComboBoxItem Content="Legado" Tag="Legacy"/>
-                        <ComboBoxItem Content="Rápido" Tag="Fast"/>
-                        <ComboBoxItem Content="Compatibilidade" Tag="Compatibility"/>
-                        <ComboBoxItem Content="Natural" Tag="Natural"/>
-                        <ComboBoxItem Content="Personalizado" Tag="Custom"/>
-                    </ComboBox>
-
-                    <!-- Layout de destino compacto -->
-                    <TextBlock Text="Layout:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
-                    <ComboBox Width="135" SelectedValuePath="Tag"
-                              SelectedValue="{Binding SelectedTargetLayoutTag, Mode=TwoWay}"
-                              Margin="0,0,10,0" VerticalAlignment="Center"
-                              AutomationProperties.Name="Layout de teclado de destino">
-                        <ComboBoxItem Content="Host (Ativo)" Tag="HostForeground"/>
-                        <ComboBoxItem Content="PT-BR ABNT2" Tag="00010416"/>
-                        <ComboBoxItem Content="US-Intl" Tag="00020409"/>
-                        <ComboBoxItem Content="US" Tag="00000409"/>
-                    </ComboBox>
-
-                    <!-- §2 Ambiente (Externo / Integrado — visível somente com a flag EmbeddedBrowser) -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEmbeddedEnvironmentVisible}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <TextBlock Text="Ambiente:" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0"/>
-                        <ComboBox x:Name="EnvironmentCombo" Width="155" SelectedValuePath="Tag"
-                                  SelectedValue="{Binding SelectedEnvironmentTag, Mode=TwoWay}"
-                                  SelectionChanged="EnvironmentCombo_SelectionChanged"
-                                  VerticalAlignment="Center"
-                                  AutomationProperties.Name="Ambiente de destino">
-                            <ComboBoxItem Content="Externo" Tag="External"/>
-                            <ComboBoxItem Content="Integrado (experimental)" Tag="Embedded"/>
-                        </ComboBox>
+                <!-- Modo: Editor | Fila -->
+                <Border Grid.Column="1" Margin="20,0,0,0" Padding="3" CornerRadius="8" VerticalAlignment="Center"
+                        Background="{DynamicResource AppBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Content="Editor" GroupName="MainWorkModeGroup"
+                                     Style="{StaticResource SegmentedRadioButtonStyle}"
+                                     IsChecked="{Binding IsSmartEditorMode, Mode=TwoWay}"
+                                     Padding="16,5" Margin="0"
+                                     ToolTip="Editor inteligente (Delphi / SQL) com divisão em blocos"
+                                     AutomationProperties.Name="Modo Editor inteligente"/>
+                        <RadioButton Content="Fila" GroupName="MainWorkModeGroup"
+                                     Style="{StaticResource SegmentedRadioButtonStyle}"
+                                     IsChecked="{Binding IsSimpleQueueMode, Mode=TwoWay}"
+                                     Padding="16,5" Margin="0"
+                                     ToolTip="Fila simples de blocos de texto"
+                                     AutomationProperties.Name="Modo Fila simples"/>
                     </StackPanel>
-                </WrapPanel>
-            </DockPanel>
-        </Border>
-
-        <!-- Conteúdo principal -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="8"/>
-                <ColumnDefinition Width="1*" MinWidth="290"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Coluna Principal: Alternância entre Editor Inteligente de Código e Fila Simples -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Barra de seleção de modo (Editor de Código vs Fila Simples) -->
-                <Border Grid.Row="0" Background="#EEF2F6" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,0,0,6">
-                    <DockPanel LastChildFill="True">
-                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                            <RadioButton Content="Editor Inteligente (Delphi / SQL)"
-                                         IsChecked="{Binding IsSmartEditorMode, Mode=TwoWay}"
-                                         FontWeight="SemiBold" FontSize="11.5" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                            <RadioButton Content="Fila Simples"
-                                         IsChecked="{Binding IsSimpleQueueMode, Mode=OneWay}"
-                                         FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <TextBlock Text="PREPARAÇÃO E ENVIO DE CÓDIGO" FontSize="11" FontWeight="Bold" Foreground="#334155" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    </DockPanel>
                 </Border>
 
-                <!-- Painel 1: Editor Inteligente Delphi/SQL com Abas de Documentos e Blocos -->
-                <Grid Grid.Row="1">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSmartEditorMode}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+                <!-- Motor de digitação (resumo + painel com Método / Perfil / Layout / Ambiente) -->
+                <Grid Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <ToggleButton x:Name="EngineToggle" Style="{StaticResource ChipToggleStyle}"
+                                  IsEnabled="{Binding CanEditQueue}"
+                                  ToolTip="Método, perfil de temporização, layout do destino e ambiente"
+                                  AutomationProperties.Name="Configurar motor de digitação">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Motor" Style="{StaticResource CompactHideStyle}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding EngineSummaryText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE70D;" FontFamily="{DynamicResource IconFontFamily}" FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <Popup x:Name="EnginePopup" PlacementTarget="{Binding ElementName=EngineToggle}"
+                           Placement="Bottom" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                           IsOpen="{Binding IsChecked, ElementName=EngineToggle, Mode=TwoWay}">
+                        <Border Margin="6,4,16,18" Padding="16,12,16,16" Width="310" CornerRadius="8"
+                                Background="{DynamicResource SurfaceElevatedBrush}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.30" Color="Black"/>
+                            </Border.Effect>
+                            <StackPanel IsEnabled="{Binding CanEditQueue}">
+                                <TextBlock Text="Motor de digitação" Style="{StaticResource PanelTitleStyle}"/>
+
+                                <TextBlock Text="Método" Style="{StaticResource FieldLabelStyle}"/>
+                                <ComboBox SelectedValuePath="Tag"
+                                          SelectedValue="{Binding SelectedMethodTag, Mode=TwoWay}"
+                                          AutomationProperties.Name="Método de digitação">
+                                    <ComboBoxItem Content="Automático" Tag="Automatico"/>
+                                    <ComboBoxItem Content="Físico" Tag="TecladoFisico"/>
+                                    <ComboBoxItem Content="Unicode" Tag="Unicode"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Perfil de temporização" Style="{StaticResource FieldLabelStyle}"/>
+                                <ComboBox SelectedValuePath="Tag"
+                                          SelectedValue="{Binding SelectedProfileTag, Mode=TwoWay}"
+                                          AutomationProperties.Name="Perfil de temporização">
+                                    <ComboBoxItem Content="Legado" Tag="Legacy"/>
+                                    <ComboBoxItem Content="Rápido" Tag="Fast"/>
+                                    <ComboBoxItem Content="Compatibilidade" Tag="Compatibility"/>
+                                    <ComboBoxItem Content="Natural" Tag="Natural"/>
+                                    <ComboBoxItem Content="Personalizado" Tag="Custom"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Layout de teclado do destino" Style="{StaticResource FieldLabelStyle}"/>
+                                <ComboBox SelectedValuePath="Tag"
+                                          SelectedValue="{Binding SelectedTargetLayoutTag, Mode=TwoWay}"
+                                          AutomationProperties.Name="Layout de teclado de destino">
+                                    <ComboBoxItem Content="Host (ativo)" Tag="HostForeground"/>
+                                    <ComboBoxItem Content="PT-BR ABNT2" Tag="00010416"/>
+                                    <ComboBoxItem Content="US-Intl" Tag="00020409"/>
+                                    <ComboBoxItem Content="US" Tag="00000409"/>
+                                </ComboBox>
+
+                                <!-- Ambiente (Externo / Integrado) — visível somente com a flag EmbeddedBrowser -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsEmbeddedEnvironmentVisible}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="Ambiente" Style="{StaticResource FieldLabelStyle}"/>
+                                    <ComboBox x:Name="EnvironmentCombo" SelectedValuePath="Tag"
+                                              SelectedValue="{Binding SelectedEnvironmentTag, Mode=TwoWay}"
+                                              SelectionChanged="EnvironmentCombo_SelectionChanged"
+                                              AutomationProperties.Name="Ambiente de destino">
+                                        <ComboBoxItem Content="Externo" Tag="External"/>
+                                        <ComboBoxItem Content="Integrado (experimental)" Tag="Embedded"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+
+                <!-- Destino monitorado -->
+                <Border Grid.Column="3" Margin="12,0,12,0" Padding="10,5" CornerRadius="6" VerticalAlignment="Center"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource AppBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <TextBlock x:Name="TargetIndicatorLabel"
+                               Text="{Binding TargetIndicatorText}"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding TargetIndicatorText}"
+                               AutomationProperties.Name="Destino monitorado pelo TargetGuard"/>
+                </Border>
+
+                <!-- Ações globais -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="DiagnosticsButton" Style="{StaticResource ToolbarButtonStyle}" Click="OpenDiagnostics_Click"
+                            IsEnabled="{Binding CanEditQueue}"
+                            ToolTip="Abrir painel de diagnóstico" AutomationProperties.Name="Diagnóstico">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE9D9;"/>
+                            <TextBlock Text="Diagnóstico" Style="{StaticResource CompactHideStyle}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="SettingsButton" Style="{StaticResource ToolbarButtonStyle}" Click="OpenSettings_Click"
+                            IsEnabled="{Binding CanEditQueue}"
+                            ToolTip="Configurações" AutomationProperties.Name="Configurações">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE713;"/>
+                            <TextBlock Text="Configurações" Style="{StaticResource CompactHideStyle}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Border Style="{StaticResource ToolbarDividerStyle}" Margin="2,0,6,0"/>
+                    <Button x:Name="ToggleStatusButton" Style="{StaticResource ToolbarButtonStyle}" Click="ToggleStatus_Click"
+                            ToolTip="Mostrar ou ocultar o painel de status (Ctrl+Shift+L)"
+                            AutomationProperties.Name="Mostrar ou ocultar painel de status">
+                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE946;"/>
+                    </Button>
+                    <Button x:Name="ThemeButton" Style="{StaticResource ToolbarButtonStyle}" Click="ToggleTheme_Click"
+                            ToolTip="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CurrentTheme, Converter={x:Static helpers:ThemeConverter.Instance}, ConverterParameter=tooltip}"
+                            AutomationProperties.Name="Alternar tema">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyphStyle}"
+                                       Text="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CurrentTheme, Converter={x:Static helpers:ThemeConverter.Instance}, ConverterParameter=glyph}"/>
+                            <TextBlock Style="{StaticResource CompactHideStyle}" Margin="7,0,0,0" VerticalAlignment="Center" MinWidth="34"
+                                       Text="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CurrentTheme, Converter={x:Static helpers:ThemeConverter.Instance}}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============================ ÁREA DE TRABALHO ============================ -->
+        <Grid Grid.Row="1" Margin="10,10,10,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="420"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="StatusColumn" Width="330" MaxWidth="560"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Coluna principal: Editor inteligente OU Fila simples -->
+            <Grid Grid.Column="0">
+
+                <!-- ===== Painel 1: Editor inteligente ===== -->
+                <Grid x:Name="SmartEditorGrid"
+                      Visibility="{Binding IsSmartEditorMode, Converter={StaticResource BoolToVisibility}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 2. Abas de documentos -->
+                    <Grid Grid.Row="0" Margin="0,0,0,-1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      VerticalAlignment="Bottom">
+                            <ItemsControl ItemsSource="{Binding DocManager.Documents}" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:SourceDocument}">
+                                        <Border x:Name="TabRoot" Margin="0,0,3,0" CornerRadius="7,7,0,0" BorderThickness="1,1,1,0"
+                                                BorderBrush="Transparent" Background="Transparent" MaxWidth="280">
+                                            <Grid>
+                                                <Rectangle x:Name="SelBar" Height="2" VerticalAlignment="Top" Margin="6,0"
+                                                           Fill="{DynamicResource AccentBrush}" Visibility="Collapsed"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource TabBodyButtonStyle}"
+                                                            Click="SelectDocumentTab_Click" Tag="{Binding}"
+                                                            ToolTip="{Binding FilePath}"
+                                                            AutomationProperties.Name="{Binding Name}">
+                                                        <StackPanel Orientation="Horizontal" Margin="10,7,6,7">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                                       MaxWidth="160" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="&#x25CF;" FontSize="10" Margin="6,1,0,0" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource WarningBrush}"
+                                                                       ToolTip="Alterações não salvas"
+                                                                       Visibility="{Binding IsModified, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <TextBlock Text="{Binding LanguageLabel}" FontSize="12" Margin="10,0,0,0"
+                                                                       VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Grid.Column="1" Style="{StaticResource TabCloseButtonStyle}"
+                                                            Click="CloseDocumentTab_Click" Tag="{Binding}"
+                                                            ToolTip="Fechar documento"
+                                                            AutomationProperties.Name="Fechar documento"/>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <Trigger SourceName="TabRoot" Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="TabRoot" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter TargetName="TabRoot" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                                <Setter TargetName="TabRoot" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                                <Setter TargetName="SelBar" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <Button Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Click="DocumentOverflow_Click"
+                                VerticalAlignment="Center" Margin="4,0,0,2" MinWidth="30" Padding="6,5"
+                                ToolTip="Todos os documentos abertos" AutomationProperties.Name="Lista de documentos abertos">
+                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE70D;" FontSize="11"/>
+                        </Button>
+                        <Button Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Click="NewCodeDocument_Click"
+                                VerticalAlignment="Center" Margin="0,0,0,2" MinWidth="30" Padding="6,5"
+                                ToolTip="Novo documento (Ctrl+N)" AutomationProperties.Name="Criar novo documento">
+                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE710;"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- 3. Barra de ferramentas do documento -->
+                    <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,1,1,0"
+                            CornerRadius="0,7,0,0" Padding="8,6,8,2">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button x:Name="ToggleStructureButton" Style="{StaticResource ToolbarButtonStyle}" Click="ToggleStructure_Click"
+                                        ToolTip="Mostrar ou ocultar a estrutura (Ctrl+Shift+E)"
+                                        AutomationProperties.Name="Mostrar ou ocultar estrutura do documento">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE8FD;"/>
+                                        <TextBlock Text="Estrutura" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="OpenContextMenu_Click" Margin="0"
+                                        ToolTip="Mais ações do documento" AutomationProperties.Name="Mais ações do documento">
+                                    <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE712;"/>
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Salvar como…" InputGestureText="Ctrl+Shift+S" Click="SaveAsCodeDocument_Click"/>
+                                            <MenuItem Header="Ir para linha…" InputGestureText="Ctrl+G" Click="GoToLine_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Aumentar fonte do editor" Click="ZoomIn_Click"/>
+                                            <MenuItem Header="Diminuir fonte do editor" Click="ZoomOut_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Fechar documento" InputGestureText="Ctrl+W" Click="CloseCurrentDocument_Click"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                            </StackPanel>
+
+                            <WrapPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="OpenCodeFile_Click" Margin="0,0,4,4"
+                                        ToolTip="Abrir arquivo .pas, .sql… (Ctrl+O)" AutomationProperties.Name="Abrir arquivo de código">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE8E5;"/>
+                                        <TextBlock Text="Abrir" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="SaveCodeDocument_Click" Margin="0,0,4,4"
+                                        ToolTip="Salvar documento (Ctrl+S)" AutomationProperties.Name="Salvar documento">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE74E;"/>
+                                        <TextBlock Text="Salvar" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Border Style="{StaticResource ToolbarDividerStyle}" Margin="2,0,6,4"/>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="Undo_Click" Margin="0,0,2,4" MinWidth="32"
+                                        ToolTip="Desfazer (Ctrl+Z)" AutomationProperties.Name="Desfazer">
+                                    <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE7A7;"/>
+                                </Button>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="Redo_Click" Margin="0,0,2,4" MinWidth="32"
+                                        ToolTip="Refazer (Ctrl+Y)" AutomationProperties.Name="Refazer">
+                                    <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE7A6;"/>
+                                </Button>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="Search_Click" Margin="0,0,2,4" MinWidth="32"
+                                        ToolTip="Buscar (Ctrl+F)" AutomationProperties.Name="Buscar no documento">
+                                    <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE721;"/>
+                                </Button>
+                                <Border Style="{StaticResource ToolbarDividerStyle}" Margin="4,0,6,4"/>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="OpenContextMenu_Click" Margin="0,0,6,4"
+                                        ToolTip="Dividir, unir e restaurar blocos do documento" AutomationProperties.Name="Ações de divisão em blocos">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE8C6;"/>
+                                        <TextBlock Text="Dividir" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE70D;" FontSize="10" Margin="7,0,0,0"/>
+                                    </StackPanel>
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Dividir no cursor" ToolTip="Divide o bloco ativo exatamente na posição atual do cursor" Click="SplitAtCaret_Click"/>
+                                            <MenuItem Header="Unir com o próximo bloco" ToolTip="Mescla o bloco ativo com o bloco consecutivo" Click="MergeNextBlock_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Restaurar divisão automática" ToolTip="Restaura a divisão automática do documento" Click="ReSplit_Click"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,10,4" VerticalAlignment="Center">
+                                    <TextBlock Text="Linguagem" Style="{StaticResource CompactHideStyle}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <ComboBox Width="150" SelectedValuePath="Tag"
+                                              SelectedValue="{Binding DocManager.CurrentLanguage, Mode=TwoWay}"
+                                              AutomationProperties.Name="Linguagem do documento">
+                                        <ComboBoxItem Content="Texto plano" Tag="{x:Static models:SourceLanguage.PlainText}"/>
+                                        <ComboBoxItem Content="Delphi / Pascal" Tag="{x:Static models:SourceLanguage.Delphi}"/>
+                                        <ComboBoxItem Content="SQL Firebird" Tag="{x:Static models:SourceLanguage.SqlFirebird}"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,10,4" VerticalAlignment="Center">
+                                    <TextBlock Text="Divisão" Style="{StaticResource CompactHideStyle}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <ComboBox Width="190" SelectedValuePath="Tag"
+                                              SelectedValue="{Binding DocManager.CurrentSplitLevel, Mode=TwoWay}"
+                                              AutomationProperties.Name="Nível de divisão">
+                                        <ComboBoxItem Content="1 · Arquivo completo" Tag="1"/>
+                                        <ComboBoxItem Content="2 · Seções principais" Tag="2"/>
+                                        <ComboBoxItem Content="3 · Declarações / métodos" Tag="3"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding DocManager.CurrentDocument.EncodingName}" FontSize="12"
+                                           Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,0,4"
+                                           ToolTip="Codificação do arquivo"/>
+                            </WrapPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- 4. Corpo: Estrutura | Editor -->
+                    <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="0,0,7,7">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="StructureColumn" Width="250" MaxWidth="460"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*" MinWidth="240"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Navegador de estrutura -->
+                            <Grid Grid.Column="0" ClipToBounds="True">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="12,10,12,6" LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left" Text="Estrutura" Style="{StaticResource PanelTitleStyle}"/>
+                                    <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center"
+                                               Text="{Binding DocManager.CurrentDocument.Blocks.Count, StringFormat='{}{0} seções'}"
+                                               Style="{StaticResource MutedCaptionStyle}"/>
+                                </DockPanel>
+                                <Grid Grid.Row="1">
+                                    <ListBox x:Name="StructureList"
+                                             ItemsSource="{Binding DocManager.CurrentDocument.Blocks}"
+                                             SelectedItem="{Binding DocManager.SelectedBlock, Mode=TwoWay}"
+                                             ItemContainerStyle="{StaticResource StructureItemStyle}"
+                                             Margin="6,0,6,6" KeyDown="StructureList_KeyDown"
+                                             AutomationProperties.Name="Estrutura do documento: seções e blocos">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type models:CodeBlock}">
+                                                <Border Background="Transparent" MouseLeftButtonUp="SelectStructureItem_Click"
+                                                        ToolTip="Clique para ir ao trecho e selecioná-lo no editor">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border x:Name="Strip" Grid.Column="0" Width="3" Margin="6,7,0,7" CornerRadius="2"
+                                                                Background="{DynamicResource BorderBrush}"/>
+                                                        <StackPanel Grid.Column="1" Margin="9,6,6,7">
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                                                <Run Text="{Binding KindLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding LineRangeDisplay, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Length, Mode=OneWay, StringFormat='{}{0:N0} car.'}"/>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <TextBlock x:Name="StatusGlyph" Grid.Column="2" FontFamily="{DynamicResource IconFontFamily}"
+                                                                   FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                                    </Grid>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Sent">
+                                                        <Setter TargetName="Strip" Property="Background" Value="{DynamicResource SuccessBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Text" Value="&#xE73E;"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="StatusGlyph" Property="ToolTip" Value="Enviado"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Typing">
+                                                        <Setter TargetName="Strip" Property="Background" Value="{DynamicResource WarningBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Text" Value="&#xE768;"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="StatusGlyph" Property="ToolTip" Value="Digitando"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                        <Setter TargetName="Strip" Property="Background" Value="{DynamicResource DangerBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Text" Value="&#xE7BA;"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Foreground" Value="{DynamicResource DangerBrush}"/>
+                                                        <Setter TargetName="StatusGlyph" Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="StatusGlyph" Property="ToolTip" Value="Falha"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <TextBlock Text="Nenhuma seção detectada. Digite ou abra um arquivo para ver a estrutura."
+                                               TextWrapping="Wrap" Margin="16,8,16,0" VerticalAlignment="Top"
+                                               IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource MutedCaptionStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=StructureList}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Grid>
+
+                            <GridSplitter x:Name="StructureSplitter" Grid.Column="1" Style="{StaticResource VerticalSplitterStyle}"
+                                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                                          AutomationProperties.Name="Redimensionar painel de estrutura"/>
+
+                            <!-- Editor -->
+                            <Grid Grid.Column="2">
+                                <editor:CodeEditorControl x:Name="CodeEditor"
+                                                          Text="{Binding DocManager.CurrentDocument.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                          SourceLanguage="{Binding DocManager.CurrentLanguage, Mode=OneWay}"
+                                                          SelectedText="{Binding EditorSelectionText, Mode=OneWayToSource}"/>
+                                <!-- Estado vazio: orienta o primeiro passo -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Margin="0,0,0,24">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DocManager.CurrentDocument.CharacterCount}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="Documento vazio" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="Digite ou cole o código aqui, ou abra um arquivo com Ctrl+O."
+                                               Margin="0,4,0,0" HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- ===== Painel 2: Fila simples ===== -->
+                <Grid x:Name="SimpleQueuePanel"
+                      Visibility="{Binding IsSimpleQueueMode, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Barra de Abas de Documentos e Ações de Arquivo -->
-                    <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0" Padding="4">
-                        <DockPanel LastChildFill="True">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                <Button Content="📂 Abrir Arquivo (.pas, .sql...)" Click="OpenCodeFile_Click" Padding="8,3" Margin="0,0,4,0"
-                                        AutomationProperties.Name="Abrir arquivo de código"/>
-                                <Button Content="+ Novo Documento" Click="NewCodeDocument_Click" Padding="8,3"
-                                        AutomationProperties.Name="Criar novo documento"/>
+                    <Border Grid.Row="0" Style="{StaticResource CardBorderStyle}" Padding="8,6" Margin="0,0,0,8">
+                        <DockPanel LastChildFill="False" IsEnabled="{Binding CanEditQueue}">
+                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                <Button Style="{StaticResource PrimaryButtonStyle}" Click="AddBlock_Click" Margin="0,0,6,0"
+                                        AutomationProperties.Name="Adicionar bloco">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE710;"/>
+                                        <TextBlock Text="Adicionar bloco" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="RestartQueue_Click" Margin="0,0,6,0" AutomationProperties.Name="Reiniciar fila">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE72C;"/>
+                                        <TextBlock Text="Reiniciar fila" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="NewQueue_Click" Margin="0" AutomationProperties.Name="Nova fila">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE74D;"/>
+                                        <TextBlock Text="Nova fila" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-
-                            <!-- Lista horizontal de abas de documentos abertos -->
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl ItemsSource="{Binding DocManager.Documents}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type models:SourceDocument}">
-                                            <Border BorderThickness="1" CornerRadius="3" Margin="0,0,4,0" Padding="6,2">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#F1F5F9"/>
-                                                        <Setter Property="BorderBrush" Value="#CBD5E1"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.DocManager.CurrentDocument}" Value="{Binding}">
-                                                                <Setter Property="Background" Value="#FFFFFF"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                                                <Setter Property="BorderThickness" Value="1.5"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,6,0"
-                                                            Click="SelectDocumentTab_Click" Tag="{Binding}"
-                                                            Cursor="Hand" AutomationProperties.Name="{Binding Name}">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11.5"/>
-                                                            <TextBlock Text="{Binding LineCount, StringFormat=' ({0} lin)'}" FontSize="10.5" Foreground="Gray"/>
-                                                        </StackPanel>
-                                                    </Button>
-                                                    <Button Content="×" Background="Transparent" BorderThickness="0" FontWeight="Bold" FontSize="11" Foreground="#94A3B8"
-                                                            Padding="2,0" Margin="2,0,0,0" ToolTip="Fechar documento"
-                                                            Click="CloseDocumentTab_Click" Tag="{Binding}"
-                                                            AutomationProperties.Name="Fechar documento"/>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding QueueSummary}" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="12,0,4,0"/>
                         </DockPanel>
                     </Border>
 
-                    <!-- Barra de Metadados e Controles de Divisão Estrutural (Smart Split) -->
-                    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1,0,1,1" Padding="6,4">
-                        <DockPanel LastChildFill="True">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                <Button Content="✂ Dividir no Cursor" Click="SplitAtCaret_Click" Padding="6,2" Margin="0,0,4,0" FontSize="11"
-                                        ToolTip="Divide o bloco ativo exatamente na posição atual do cursor"
-                                        AutomationProperties.Name="Dividir no cursor"/>
-                                <Button Content="🔗 Unir com Próximo" Click="MergeNextBlock_Click" Padding="6,2" Margin="0,0,4,0" FontSize="11"
-                                        ToolTip="Mescla o bloco ativo com o bloco consecutivo"
-                                        AutomationProperties.Name="Unir com próximo bloco"/>
-                                <Button Content="🔄 Restaurar Divisão" Command="{Binding ReSplitCommand}" Padding="6,2" FontSize="11"
-                                        ToolTip="Restaura a divisão automática do documento"
-                                        AutomationProperties.Name="Restaurar divisão automática"/>
-                            </StackPanel>
-
-                            <WrapPanel VerticalAlignment="Center">
-                                <TextBlock Text="Linguagem:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0"/>
-                                <ComboBox Width="120" SelectedValuePath="Tag"
-                                          SelectedValue="{Binding DocManager.CurrentLanguage, Mode=TwoWay}"
-                                          Margin="0,0,10,0" FontSize="11">
-                                    <ComboBoxItem Content="Texto Plano" Tag="{x:Static models:SourceLanguage.PlainText}"/>
-                                    <ComboBoxItem Content="Delphi / Pascal" Tag="{x:Static models:SourceLanguage.Delphi}"/>
-                                    <ComboBoxItem Content="SQL Firebird" Tag="{x:Static models:SourceLanguage.SqlFirebird}"/>
-                                </ComboBox>
-
-                                <TextBlock Text="Nível Divisão:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0"/>
-                                <ComboBox Width="135" SelectedValuePath="Tag"
-                                          SelectedValue="{Binding DocManager.CurrentSplitLevel, Mode=TwoWay}"
-                                          Margin="0,0,10,0" FontSize="11">
-                                    <ComboBoxItem Content="1: Arquivo Completo" Tag="1"/>
-                                    <ComboBoxItem Content="2: Seções Principais" Tag="2"/>
-                                    <ComboBoxItem Content="3: Declarações / Métodos" Tag="3"/>
-                                </ComboBox>
-
-                                <TextBlock Text="{Binding DocManager.CurrentDocument.EncodingName, StringFormat='Enc: {0}'}"
-                                           VerticalAlignment="Center" FontSize="10.5" Foreground="#64748B" Margin="0,0,10,0"/>
-                            </WrapPanel>
-                        </DockPanel>
-                    </Border>
-
-                    <!-- Editor de Código Principal (AvalonEdit) -->
-                    <Border Grid.Row="2" BorderThickness="1,0,1,1" BorderBrush="#CBD5E1">
-                        <editor:CodeEditorControl x:Name="CodeEditor"
-                                                 Text="{Binding DocManager.CurrentDocument.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 SourceLanguage="{Binding DocManager.CurrentLanguage, Mode=OneWay}"/>
-                    </Border>
-
-                    <!-- Barra Inferior de Abas dos Blocos Inteligentes Derivados -->
-                    <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="4">
-                        <DockPanel LastChildFill="True">
-                            <TextBlock DockPanel.Dock="Left" Text="Blocos Estruturais:" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="4,0,8,0"/>
-
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl ItemsSource="{Binding DocManager.CurrentDocument.Blocks}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type models:CodeBlock}">
-                                            <Border BorderThickness="1" CornerRadius="3" Margin="0,0,4,0" Padding="6,2">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#FFFFFF"/>
-                                                        <Setter Property="BorderBrush" Value="#CBD5E1"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.DocManager.SelectedBlock}" Value="{Binding}">
-                                                                <Setter Property="Background" Value="#EFF6FF"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                                                <Setter Property="BorderThickness" Value="1.5"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Sent">
-                                                                <Setter Property="Background" Value="#F0FDF4"/>
-                                                                <Setter Property="BorderBrush" Value="#86EFAC"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Typing">
-                                                                <Setter Property="Background" Value="#FFFBEB"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Failed">
-                                                                <Setter Property="Background" Value="#FEF2F2"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <Button Background="Transparent" BorderThickness="0" Padding="0"
-                                                        Click="SelectBlockTab_Click" Tag="{Binding}" Cursor="Hand"
-                                                        AutomationProperties.Name="{Binding Title}">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="11"/>
-                                                        <TextBlock Text="{Binding LineRangeDisplay, StringFormat=' [{0}]'}" FontSize="10.5" Foreground="#64748B" Margin="4,0,0,0"/>
-                                                        <TextBlock Text="{Binding Length, StringFormat=' ({0} car)'}" FontSize="10" Foreground="#94A3B8" Margin="2,0,0,0"/>
-                                                    </StackPanel>
-                                                </Button>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </DockPanel>
-                    </Border>
-                </Grid>
-
-                <!-- Painel 2: Fila Simples Clássica de Blocos -->
-                <DockPanel Grid.Row="1">
-                    <DockPanel.Style>
-                        <Style TargetType="DockPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSimpleQueueMode}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </DockPanel.Style>
-
-                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8" IsEnabled="{Binding CanEditQueue}">
-                        <Button Content="+ ADICIONAR BLOCO" Click="AddBlock_Click"
-                                AutomationProperties.Name="Adicionar bloco"/>
-                        <Button Content="REINICIAR FILA" Click="RestartQueue_Click"
-                                AutomationProperties.Name="Reiniciar fila"/>
-                        <Button Content="NOVA FILA" Click="NewQueue_Click"
-                                AutomationProperties.Name="Nova fila"/>
-                    </StackPanel>
-
-                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding QueueSummary}"
-                               FontWeight="Bold" Margin="0,8,0,0"/>
-
-                    <Border IsEnabled="{Binding CanEditQueue}">
+                    <Border Grid.Row="1" IsEnabled="{Binding CanEditQueue}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl x:Name="QueueBlocksItemsControl" ItemsSource="{Binding Blocks}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type models:TextBlockItem}">
-                                        <Border BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                        <Border BorderThickness="1" CornerRadius="7" Padding="12,10" Margin="0,0,0,8">
                                             <Border.Style>
                                                 <Style TargetType="Border">
-                                                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
-                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                                    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsNext}" Value="True">
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             <Setter Property="BorderThickness" Value="2"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Status}" Value="Typing">
-                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                            <Setter Property="BorderThickness" Value="2"/>
-                                                            <Setter Property="Background" Value="#FFF8E8"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Status}" Value="Paused">
-                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                            <Setter Property="BorderThickness" Value="2"/>
-                                                            <Setter Property="Background" Value="#FFF8E8"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding Status}" Value="Sent">
-                                                            <Setter Property="Background" Value="#F1F7FC"/>
-                                                            <Setter Property="BorderBrush" Value="#9CC2E6"/>
+                                                            <Setter Property="Background" Value="{DynamicResource InfoBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Typing">
+                                                            <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Paused">
+                                                            <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding Status}" Value="PartiallySent">
-                                                            <Setter Property="Background" Value="#FFF5E5"/>
-                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                            <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding Status}" Value="Interrupted">
-                                                            <Setter Property="Background" Value="#FFF5E5"/>
-                                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                            <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding Status}" Value="Failed">
-                                                            <Setter Property="Background" Value="#FDECEC"/>
-                                                            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
-                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                            <Setter Property="Background" Value="{DynamicResource DangerBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -389,17 +763,37 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="Bold"/>
-                                                    <Border Grid.Column="1" CornerRadius="3" Padding="6,1" Background="{Binding StatusBackgroundHex}">
-                                                        <TextBlock Text="{Binding StatusLabel}" FontWeight="Bold" Foreground="{Binding StatusColorHex}"/>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Header}" FontWeight="SemiBold" FontSize="14"
+                                                               VerticalAlignment="Center"/>
+                                                    <Border Grid.Column="1" CornerRadius="4" Padding="8,2" BorderThickness="1">
+                                                        <Border.Background>
+                                                            <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="tint">
+                                                                <Binding Path="StatusColorHex"/>
+                                                                <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                                            </MultiBinding>
+                                                        </Border.Background>
+                                                        <Border.BorderBrush>
+                                                            <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="border">
+                                                                <Binding Path="StatusColorHex"/>
+                                                                <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                                            </MultiBinding>
+                                                        </Border.BorderBrush>
+                                                        <TextBlock Text="{Binding StatusLabel}" FontWeight="SemiBold" FontSize="12">
+                                                            <TextBlock.Foreground>
+                                                                <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="fg">
+                                                                    <Binding Path="StatusColorHex"/>
+                                                                    <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                                                </MultiBinding>
+                                                            </TextBlock.Foreground>
+                                                        </TextBlock>
                                                     </Border>
                                                 </Grid>
 
                                                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
                                                          IsReadOnly="{Binding IsTypingOrPaused}"
                                                          AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
-                                                         MaxHeight="140" VerticalScrollBarVisibility="Auto"
-                                                         FontFamily="Consolas" FontSize="13" Margin="0,6,0,4"
+                                                         MaxHeight="150" VerticalScrollBarVisibility="Auto"
+                                                         FontFamily="{DynamicResource EditorFontFamily}" Margin="0,8,0,6"
                                                          AutomationProperties.Name="{Binding Header}"/>
 
                                                 <Grid>
@@ -407,25 +801,32 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="Gray" FontSize="11">
+                                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}">
                                                         <Run Text="{Binding CharacterCount, Mode=OneWay, StringFormat='Caracteres: {0}'}"/>
-                                                        <Run Text="    "/>
+                                                        <Run Text="   "/>
                                                         <Run Text="{Binding LineCount, Mode=OneWay, StringFormat='Linhas: {0}'}"/>
                                                     </TextBlock>
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                        <Button Content="↑" Padding="8,2" MinWidth="30"
+                                                        <Button Margin="0,0,4,0" MinWidth="34"
+                                                                ToolTip="Mover bloco para cima"
                                                                 AutomationProperties.Name="Mover bloco para cima"
                                                                 Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                CommandParameter="{Binding}"/>
-                                                        <Button Content="↓" Padding="8,2" MinWidth="30"
+                                                                CommandParameter="{Binding}">
+                                                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE70E;"/>
+                                                        </Button>
+                                                        <Button Margin="0,0,4,0" MinWidth="34"
+                                                                ToolTip="Mover bloco para baixo"
                                                                 AutomationProperties.Name="Mover bloco para baixo"
                                                                 Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                CommandParameter="{Binding}"/>
-                                                        <Button Content="Definir como próximo" Padding="8,2"
+                                                                CommandParameter="{Binding}">
+                                                            <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE70D;"/>
+                                                        </Button>
+                                                        <Button Content="Definir como próximo" Margin="0,0,4,0"
                                                                 AutomationProperties.Name="Definir bloco como próximo"
                                                                 Command="{Binding DataContext.SetAsNextCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                                 CommandParameter="{Binding}"/>
-                                                        <Button Content="Remover" Padding="8,2" Tag="{Binding}" Click="RemoveBlock_Click"
+                                                        <Button Content="Remover" Margin="0" Tag="{Binding}" Click="RemoveBlock_Click"
                                                                 AutomationProperties.Name="Remover bloco"/>
                                                     </StackPanel>
                                                 </Grid>
@@ -436,130 +837,309 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </Border>
-                </DockPanel>
+                </Grid>
             </Grid>
 
-            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch" Background="Transparent"/>
+            <GridSplitter x:Name="StatusSplitter" Grid.Column="1" Style="{StaticResource VerticalSplitterStyle}"
+                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Margin="2,0"
+                          AutomationProperties.Name="Redimensionar painel de status"/>
 
-            <!-- Painel lateral: status / histórico / log -->
-            <TabControl Grid.Column="2">
-                <TabItem Header="Status">
-                    <StackPanel Margin="6">
-                        <TextBlock Text="Estado:" FontWeight="Bold"/>
-                        <TextBlock Text="{Binding StateText}" FontSize="16" Margin="0,0,0,8"/>
+            <!-- ============================ 4. PAINEL CONTEXTUAL (Status / Histórico / Log) ============================ -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" ClipToBounds="True">
+                <TabControl Margin="0">
+                    <TabItem Header="Status">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="12,12,12,12">
 
-                        <TextBlock Text="{Binding CountdownText}" FontSize="20" FontWeight="Bold"
-                                   Foreground="{StaticResource WarnBrush}" Margin="0,0,0,8"/>
+                                <!-- Resumo: estado + mensagem -->
+                                <TextBlock Text="Estado" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding StateText}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding CountdownText}" FontSize="22" FontWeight="Bold" Margin="0,4,0,0"
+                                           Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <!-- Sem contagem regressiva ativa o espaço é liberado -->
+                                                <DataTrigger Binding="{Binding CountdownText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
 
-                        <!-- Mensagem de status com destaque amarelo/vermelho quando Warning/Error -->
-                        <Border CornerRadius="3" Padding="6" Margin="0,0,0,10">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="#F8FAFC"/>
-                                    <Setter Property="BorderBrush" Value="#E2E8F0"/>
-                                    <Setter Property="BorderThickness" Value="1"/>
+                                <Border CornerRadius="6" Padding="10,8" Margin="0,10,0,0" BorderThickness="1">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource SurfaceElevatedBrush}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusSeverity}" Value="Warning">
+                                                    <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusSeverity}" Value="Error">
+                                                    <Setter Property="Background" Value="{DynamicResource DangerBackgroundBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
+                                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource DangerTextBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Semântica de entrega (Enviado / Confirmado / Suspeito / Desconhecido / Falha) -->
+                                <TextBlock Text="Entrega" Style="{StaticResource CaptionStyle}" Margin="0,14,0,4"/>
+                                <Border Padding="10,8" CornerRadius="6" BorderThickness="1">
+                                    <Border.Background>
+                                        <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="tint">
+                                            <Binding Path="LastDeliveryBadge.ColorHex"/>
+                                            <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                        </MultiBinding>
+                                    </Border.Background>
+                                    <Border.BorderBrush>
+                                        <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="border">
+                                            <Binding Path="LastDeliveryBadge.ColorHex"/>
+                                            <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                        </MultiBinding>
+                                    </Border.BorderBrush>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding LastDeliveryBadge.FullLabel}" FontWeight="SemiBold" TextWrapping="Wrap">
+                                            <TextBlock.Foreground>
+                                                <MultiBinding Converter="{x:Static helpers:ThemedHexConverter.Instance}" ConverterParameter="fg">
+                                                    <Binding Path="LastDeliveryBadge.ColorHex"/>
+                                                    <Binding Source="{x:Static services:ThemeManager.Instance}" Path="IsDarkEffectively"/>
+                                                </MultiBinding>
+                                            </TextBlock.Foreground>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding LastDeliveryBadge.Description}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Destino -->
+                                <TextBlock Text="Destino" Style="{StaticResource CaptionStyle}" Margin="0,14,0,4"/>
+                                <TextBlock Text="{Binding TargetIndicatorText}" TextWrapping="Wrap"/>
+
+                                <!-- Detalhes avançados (recolhidos por padrão) -->
+                                <Expander x:Name="SessionDetailsExpander" Margin="0,16,0,0" Header="Detalhes da sessão" AutomationProperties.Name="Detalhes da sessão de digitação">
+                                    <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Tempo decorrido" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ElapsedText}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Unidades por segundo" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CpsText}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Total de unidades" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalCharacters, StringFormat='{}{0:N0}'}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Enviadas" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SentUnits, StringFormat='{}{0:N0}'}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Puladas" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SkippedUnits}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Falhas" Style="{StaticResource CaptionStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding FailedUnits}" FontWeight="SemiBold" Margin="0,3"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding QueueProgressLabel}"
+                                                   Style="{StaticResource CaptionStyle}" Margin="0,6,0,0"/>
+                                    </Grid>
+                                </Expander>
+
+                                <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" Style="{StaticResource MutedCaptionStyle}"
+                                           Text="ESC cancela a qualquer momento durante a digitação. “Enviado” indica retorno de SendInput/CDP; o recebimento no destino não é verificado."/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Histórico">
+                        <DockPanel Margin="10">
+                            <Button DockPanel.Dock="Bottom" Content="Limpar histórico" Command="{Binding ClearHistoryCommand}"
+                                    HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    AutomationProperties.Name="Limpar histórico"/>
+                            <ListBox ItemsSource="{Binding History}" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </TabItem>
+
+                    <TabItem Header="Log">
+                        <ListBox ItemsSource="{Binding LogLines}" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12" Margin="10">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+
+        <!-- ============================ 5. BARRA DE EXECUÇÃO ADAPTATIVA ============================ -->
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="120"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Ação primária contextual (+ menu de alvo no modo Editor) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="DigitarButton" Style="{StaticResource PrimaryButtonStyle}"
+                            Command="{Binding StartCommand}" IsEnabled="{Binding CanStartPrimary}"
+                            MinWidth="240" MaxWidth="380" Height="48" Padding="14,4" Margin="0"
+                            ToolTip="{Binding PrimaryActionHint}" ToolTipService.ShowOnDisabled="True"
+                            AutomationProperties.Name="{Binding PrimaryActionTitle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource IconGlyphStyle}" Text="&#xE768;" FontSize="16" Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PrimaryActionTitle}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding PrimaryActionSubtitle}" FontSize="12" Opacity="0.85" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <Border Grid.Column="2" Style="{StaticResource CompactHideBorderStyle}" Margin="12,0,0,0" Padding="7,2" CornerRadius="4" VerticalAlignment="Center"
+                                    Background="#33FFFFFF">
+                                <TextBlock Text="{Binding StartShortcutText}" FontSize="12" FontWeight="SemiBold"/>
+                            </Border>
+                        </Grid>
+                    </Button>
+                    <Button x:Name="DigitarMenuButton" Style="{StaticResource PrimaryButtonStyle}"
+                            Click="OpenContextMenu_Click" IsEnabled="{Binding CanEditQueue}"
+                            Visibility="{Binding IsSmartEditorMode, Converter={StaticResource BoolToVisibility}}"
+                            Width="34" Height="48" Padding="0" Margin="2,0,0,0"
+                            ToolTip="Escolher o que digitar: documento, bloco ativo ou seleção"
+                            AutomationProperties.Name="Escolher o que digitar">
+                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE70D;" FontSize="11"/>
+                        <Button.ContextMenu>
+                            <ContextMenu Placement="Top">
+                                <MenuItem Header="{Binding DocumentActionLabel}" Command="{Binding StartDocumentCommand}"
+                                          ToolTip="Digita o documento inteiro em sequência"/>
+                                <MenuItem Header="{Binding BlockActionLabel}" Command="{Binding StartBlockCommand}"
+                                          ToolTip="Digita somente o bloco ativo na estrutura"/>
+                                <MenuItem Header="{Binding SelectionActionLabel}" Command="{Binding StartSelectionCommand}"
+                                          ToolTip="Digita exclusivamente o texto selecionado no editor"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </StackPanel>
+
+                <!-- Pausar / Continuar (sempre visível) -->
+                <Button x:Name="PauseResumeButton" Grid.Column="1" Command="{Binding PauseResumeCommand}"
+                        MinWidth="130" Height="48" Margin="10,0,0,0" Padding="12,4"
+                        ToolTip="Pausa ou retoma a digitação em andamento. Disponível somente durante a digitação."
+                        ToolTipService.ShowOnDisabled="True"
+                        AutomationProperties.Name="Pausar ou continuar digitação">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{DynamicResource IconFontFamily}" FontSize="14" VerticalAlignment="Center" Text="&#xE769;">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding StatusSeverity}" Value="Warning">
-                                            <Setter Property="Background" Value="#FFF5E5"/>
-                                            <Setter Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding StatusSeverity}" Value="Error">
-                                            <Setter Property="Background" Value="#FDECEC"/>
-                                            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                        <DataTrigger Binding="{Binding PauseResumeLabel}" Value="Continuar">
+                                            <Setter Property="Text" Value="&#xE768;"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Border.Style>
-                            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap"/>
-                        </Border>
-
-                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding PercentComplete, Mode=OneWay}" Height="18"/>
-                        <TextBlock Text="{Binding UnitsProgressSummary}" FontWeight="SemiBold" FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding QueueProgressLabel}" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
-
-                        <Grid Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Tempo decorrido" FontWeight="Bold"/>
-                                <TextBlock Text="{Binding ElapsedText}"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Unidades/seg (CPS)" FontWeight="Bold"/>
-                                <TextBlock Text="{Binding CpsText}"/>
-                            </StackPanel>
-                        </Grid>
-
-                        <!-- Semântica de entrega atual -->
-                        <Border Margin="0,12,0,0" Padding="6" CornerRadius="3"
-                                Background="{Binding LastDeliveryBadge.BackgroundHex}"
-                                BorderBrush="{Binding LastDeliveryBadge.ColorHex}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="{Binding LastDeliveryBadge.FullLabel}" FontWeight="Bold"
-                                           Foreground="{Binding LastDeliveryBadge.ColorHex}"/>
-                                <TextBlock Text="{Binding LastDeliveryBadge.Description}" FontSize="10.5" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </TabItem>
-
-                <TabItem Header="Histórico">
-                    <DockPanel Margin="6">
-                        <Button DockPanel.Dock="Bottom" Content="Limpar histórico" Command="{Binding ClearHistoryCommand}"
-                                AutomationProperties.Name="Limpar histórico"/>
-                        <ListBox ItemsSource="{Binding History}" DisplayMemberPath="DisplayText" FontFamily="Consolas" FontSize="11"/>
-                    </DockPanel>
-                </TabItem>
-
-                <TabItem Header="Log">
-                    <ListBox ItemsSource="{Binding LogLines}" FontFamily="Consolas" FontSize="11" Margin="6"/>
-                </TabItem>
-            </TabControl>
-        </Grid>
-
-        <!-- §1.3 Barra de execução (rodapé) -->
-        <DockPanel Grid.Row="2" Margin="0,10,0,0">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{Binding UnitsProgressSummary}" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,10,0"/>
-                <TextBlock VerticalAlignment="Center" FontSize="11.5" Margin="0,0,10,0">
-                    <Run Text="⏱ "/>
-                    <Run Text="{Binding ElapsedText, Mode=OneWay}"/>
-                    <Run Text=" · "/>
-                    <Run Text="{Binding CpsText, Mode=OneWay}"/>
-                    <Run Text=" CPS"/>
-                </TextBlock>
-                <Button Content="Diagnóstico" Click="OpenDiagnostics_Click" Padding="8,4"
-                        AutomationProperties.Name="Abrir painel de diagnóstico"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="DigitarButton" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" MinWidth="185" Padding="12,6"
-                        Background="{StaticResource OkBrush}" Foreground="White"
-                        AutomationProperties.Name="Digitar próximo bloco">
-                    <StackPanel>
-                        <TextBlock Text="{Binding DigitarButtonWithShortcut}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding NextBlockLabel}" FontSize="10" HorizontalAlignment="Center"/>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding PauseResumeLabel}" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding PauseShortcutText}" Style="{StaticResource CompactHideStyle}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMutedBrush}"/>
                     </StackPanel>
                 </Button>
-                <!-- Botões auxiliares de digitação no Modo Smart Editor -->
-                <Button Content="DIGITAR DOCUMENTO" Command="{Binding StartDocumentCommand}" Margin="4,0,0,0" Padding="8,4"
-                        ToolTip="Digita o documento inteiro em sequência"
-                        AutomationProperties.Name="Digitar documento completo"/>
-                <Button Content="DIGITAR SELEÇÃO" Command="{Binding StartSelectionCommand}" CommandParameter="{Binding ElementName=CodeEditor, Path=SelectedText}"
-                        Margin="4,0,0,0" Padding="8,4" ToolTip="Digita exclusivamente o texto selecionado no editor"
-                        AutomationProperties.Name="Digitar seleção"/>
 
-                <Button x:Name="PauseResumeButton" Content="{Binding PauseResumeButtonWithShortcut}" Command="{Binding PauseResumeCommand}"
-                        MinWidth="140" Margin="4,0,0,0" AutomationProperties.Name="Pausar ou continuar digitação"/>
-                <Button x:Name="CancelButton" Content="{Binding CancelButtonWithShortcut}" Command="{Binding CancelCommand}"
-                        MinWidth="120" Background="{StaticResource DangerBrush}" Foreground="White" Margin="4,0,0,0"
-                        AutomationProperties.Name="Cancelar digitação"/>
-            </StackPanel>
-        </DockPanel>
+                <!-- Cancelar (sempre visível) -->
+                <Button x:Name="CancelButton" Grid.Column="2" Style="{StaticResource DangerButtonStyle}"
+                        Command="{Binding CancelCommand}"
+                        MinWidth="120" Height="48" Margin="8,0,0,0" Padding="12,4"
+                        ToolTip="Cancela a digitação em andamento (ESC). Disponível somente durante a digitação."
+                        ToolTipService.ShowOnDisabled="True"
+                        AutomationProperties.Name="Cancelar digitação">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource IconGlyphStyle}" Text="&#xE71A;"/>
+                        <TextBlock Text="Cancelar" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Esc" Style="{StaticResource CompactHideStyle}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Opacity="0.8"/>
+                    </StackPanel>
+                </Button>
 
-        <TextBlock Grid.Row="3" Text="Dica: pressione ESC a qualquer momento durante a digitação para cancelar imediatamente. O status 'Enviado' indica retorno de SendInput/CDP (recebimento não verificado)."
-                   HorizontalAlignment="Center" Margin="0,6,0,0" FontStyle="Italic" Foreground="Gray" FontSize="11"/>
+                <!-- Progresso e resumo (nunca sobrepõe os botões: coluna flexível) -->
+                <Grid Grid.Column="3" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0" FontWeight="SemiBold"
+                                   Text="{Binding PercentComplete, StringFormat='{}{0:0}%'}"/>
+                        <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    </DockPanel>
+
+                    <ProgressBar x:Name="ExecutionProgress" Grid.Row="1" Minimum="0" Maximum="100" Value="{Binding PercentComplete, Mode=OneWay}"
+                                 Height="8" Margin="0,5,0,5"/>
+
+                    <Grid Grid.Row="2">
+                        <!-- Em andamento ou concluído: contadores resumidos -->
+                        <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSecondaryBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CanStartPrimary}" Value="False"/>
+                                                <Condition Binding="{Binding IsBusy}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                            <Run Text="{Binding SentUnits, Mode=OneWay, StringFormat='Enviadas {0:N0}'}"/><Run Text=" de "/><Run Text="{Binding TotalCharacters, Mode=OneWay, StringFormat='{}{0:N0}'}"/><Run Text="   ·   "/><Run Text="{Binding ElapsedText, Mode=OneWay}"/><Run Text="   ·   "/><Run Text="{Binding CpsText, Mode=OneWay}"/><Run Text=" CPS"/>
+                        </TextBlock>
+                        <!-- Ação primária desabilitada: explica o motivo -->
+                        <TextBlock Text="{Binding PrimaryActionHint}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource WarningBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CanStartPrimary}" Value="False"/>
+                                                <Condition Binding="{Binding IsBusy}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

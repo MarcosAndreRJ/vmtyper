@@ -5,6 +5,9 @@ using VmTyper.Models;
 using VmTyper.Native;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
+using Xunit;
+
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace VmTyper.Tests;
 

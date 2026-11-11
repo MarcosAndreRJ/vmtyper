@@ -1,0 +1,108 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- VmTyper 2.0 — paleta CLARA (desenhada à parte, não é inversão da escura) -->
+    <Color x:Key="AppBackgroundColor">#EEF1F6</Color>
+    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+    <Color x:Key="SurfaceElevatedColor">#F5F7FA</Color>
+    <Color x:Key="SurfaceHoverColor">#E6EBF2</Color>
+    <Color x:Key="SurfaceActiveColor">#D9E0EA</Color>
+    <Color x:Key="BorderColor">#DCE3EC</Color>
+    <Color x:Key="BorderSubtleColor">#EBEFF5</Color>
+    <Color x:Key="ControlBorderColor">#C3CCD9</Color>
+
+    <Color x:Key="TextPrimaryColor">#111827</Color>
+    <Color x:Key="TextSecondaryColor">#475569</Color>
+    <Color x:Key="TextMutedColor">#64748B</Color>
+    <Color x:Key="TextDisabledColor">#9AA5B5</Color>
+
+    <Color x:Key="AccentColor">#2563EB</Color>
+    <Color x:Key="AccentHoverColor">#1D4ED8</Color>
+    <Color x:Key="AccentPressedColor">#1E40AF</Color>
+    <Color x:Key="AccentSubtleColor">#E3EDFF</Color>
+    <Color x:Key="AccentFillColor">#2563EB</Color>
+    <Color x:Key="AccentFillHoverColor">#1D4ED8</Color>
+    <Color x:Key="AccentFillPressedColor">#1E40AF</Color>
+
+    <Color x:Key="SuccessColor">#059669</Color>
+    <Color x:Key="SuccessBackgroundColor">#DDF5EA</Color>
+    <Color x:Key="SuccessTextColor">#065F46</Color>
+
+    <Color x:Key="WarningColor">#D97706</Color>
+    <Color x:Key="WarningBackgroundColor">#FDF0D5</Color>
+    <Color x:Key="WarningTextColor">#8A4B06</Color>
+
+    <Color x:Key="DangerColor">#DC2626</Color>
+    <Color x:Key="DangerBackgroundColor">#FDE6E6</Color>
+    <Color x:Key="DangerTextColor">#991B1B</Color>
+
+    <Color x:Key="InfoColor">#0284C7</Color>
+    <Color x:Key="InfoBackgroundColor">#E0F2FE</Color>
+    <Color x:Key="InfoTextColor">#075985</Color>
+
+    <Color x:Key="ScrollThumbColor">#C3CCD9</Color>
+    <Color x:Key="ScrollThumbHoverColor">#9AA8BA</Color>
+
+    <!-- Pincéis semânticos -->
+    <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceElevatedBrush" Color="{StaticResource SurfaceElevatedColor}"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="SurfaceActiveBrush" Color="{StaticResource SurfaceActiveColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}"/>
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="{StaticResource ControlBorderColor}"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}"/>
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}"/>
+    <SolidColorBrush x:Key="AccentSubtleBrush" Color="{StaticResource AccentSubtleColor}"/>
+    <SolidColorBrush x:Key="AccentFillBrush" Color="{StaticResource AccentFillColor}"/>
+    <SolidColorBrush x:Key="AccentFillHoverBrush" Color="{StaticResource AccentFillHoverColor}"/>
+    <SolidColorBrush x:Key="AccentFillPressedBrush" Color="{StaticResource AccentFillPressedColor}"/>
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="{StaticResource SuccessBackgroundColor}"/>
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="{StaticResource SuccessTextColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="WarningBackgroundBrush" Color="{StaticResource WarningBackgroundColor}"/>
+    <SolidColorBrush x:Key="WarningTextBrush" Color="{StaticResource WarningTextColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="DangerBackgroundBrush" Color="{StaticResource DangerBackgroundColor}"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="{StaticResource DangerTextColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+    <SolidColorBrush x:Key="InfoBackgroundBrush" Color="{StaticResource InfoBackgroundColor}"/>
+    <SolidColorBrush x:Key="InfoTextBrush" Color="{StaticResource InfoTextColor}"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="{StaticResource ScrollThumbColor}"/>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="{StaticResource ScrollThumbHoverColor}"/>
+
+    <!-- Compatibilidade com nomes legados -->
+    <SolidColorBrush x:Key="WarnBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="OkBrush" Color="{StaticResource SuccessColor}"/>
+
+    <!-- Editor (AvalonEdit) -->
+    <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="EditorForegroundBrush" Color="#111827"/>
+    <SolidColorBrush x:Key="EditorLineNumberBrush" Color="#8A96A8"/>
+    <SolidColorBrush x:Key="EditorCurrentLineBrush" Color="#F1F6FF"/>
+    <SolidColorBrush x:Key="EditorCurrentLineBorderBrush" Color="#D3E2FB"/>
+    <SolidColorBrush x:Key="EditorSelectionBrush" Color="#BFD7FF"/>
+    <SolidColorBrush x:Key="EditorCaretBrush" Color="#111827"/>
+    <SolidColorBrush x:Key="EditorMarkerBrush" Color="#FDE68A"/>
+
+    <!-- Cores de sistema redirecionadas ao tema (mesmas chaves do tema escuro, para os dois temas serem coerentes). -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="{StaticResource SurfaceElevatedColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="{StaticResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="{StaticResource ControlBorderColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="{StaticResource TextDisabledColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{StaticResource AccentFillColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+</ResourceDictionary>

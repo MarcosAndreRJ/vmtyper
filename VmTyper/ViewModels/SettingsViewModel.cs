@@ -333,6 +333,14 @@ public sealed class SettingsViewModel : ObservableObject, INotifyDataErrorInfo
         set => SetField(ref _alwaysOnTop, value);
     }
 
+    // --- Aparência ---
+    private AppTheme _theme = AppTheme.Auto;
+    public AppTheme Theme
+    {
+        get => _theme;
+        set => SetField(ref _theme, value);
+    }
+
     // --- Aba 5: Persistência ---
     private string _queueTextPersistenceTag = "Full";
     public string QueueTextPersistenceTag
@@ -442,6 +450,7 @@ public sealed class SettingsViewModel : ObservableObject, INotifyDataErrorInfo
         _startMinimized = form.StartMinimized;
         _alwaysOnTop = form.AlwaysOnTop;
         _clearTextAfterCompletion = form.ClearTextAfterCompletion;
+        _theme = form.Theme;
 
         NotifyAllPropertiesChanged();
         ValidateAndRefreshPreview();
@@ -597,7 +606,8 @@ public sealed class SettingsViewModel : ObservableObject, INotifyDataErrorInfo
             MinimizeToTray = MinimizeToTray,
             StartMinimized = StartMinimized,
             AlwaysOnTop = AlwaysOnTop,
-            ClearTextAfterCompletion = ClearTextAfterCompletion
+            ClearTextAfterCompletion = ClearTextAfterCompletion,
+            Theme = Theme
         };
 
         var result = SettingsMapper.TryBuildSettings(form, _baseSettings);

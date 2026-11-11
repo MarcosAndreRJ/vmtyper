@@ -26,6 +26,15 @@ public enum PreflightDecision
     FallbackToUnicode
 }
 
+/// <summary>O que a ação primária da barra de execução vai digitar neste momento.</summary>
+public enum ExecutionTarget
+{
+    Document,
+    Block,
+    Selection,
+    Queue
+}
+
 public sealed class MainViewModel : ObservableObject
 {
     public const int HotkeyIdStart = 1;
@@ -138,9 +147,11 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanStart));
                 OnPropertyChanged(nameof(CanPause));
                 OnPropertyChanged(nameof(PauseResumeButtonText));
+                OnPropertyChanged(nameof(PauseResumeLabel));
                 OnPropertyChanged(nameof(PauseResumeButtonWithShortcut));
                 OnPropertyChanged(nameof(TargetGuardStateText));
                 OnPropertyChanged(nameof(TargetIndicatorText));
+                NotifyPrimaryActionChanged();
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -214,6 +225,7 @@ public sealed class MainViewModel : ObservableObject
                 Settings.Method = parsed;
                 _settingsService.Save(Settings);
                 OnPropertyChanged(nameof(SelectedMethodTag));
+                OnPropertyChanged(nameof(EngineSummaryText));
             }
         }
     }
@@ -231,6 +243,7 @@ public sealed class MainViewModel : ObservableObject
             Settings.TypingProfile = value;
             _settingsService.Save(Settings);
             OnPropertyChanged(nameof(SelectedProfileTag));
+            OnPropertyChanged(nameof(EngineSummaryText));
         }
     }
 
@@ -245,12 +258,43 @@ public sealed class MainViewModel : ObservableObject
                 Settings.TargetLayout = value;
                 _settingsService.Save(Settings);
                 OnPropertyChanged(nameof(SelectedTargetLayoutTag));
+                OnPropertyChanged(nameof(EngineSummaryText));
             }
         }
     }
 
     public bool IsEmbeddedEnvironmentVisible => Settings.Features.EmbeddedBrowser;
     public bool IsCdpSubMethodVisible => Settings.Features.EmbeddedBrowser && Settings.Features.CdpInput;
+
+    /// <summary>Resumo compacto do motor de digitação para a barra superior (ex.: "Automático · Natural").</summary>
+    public string EngineSummaryText
+    {
+        get
+        {
+            string method = SelectedMethodTag switch
+            {
+                "TecladoFisico" => "Físico",
+                "Unicode" => "Unicode",
+                _ => "Automático"
+            };
+            string profile = SelectedProfileTag switch
+            {
+                "Legacy" => "Legado",
+                "Fast" => "Rápido",
+                "Compatibility" => "Compatibilidade",
+                "Natural" => "Natural",
+                "Custom" => "Personalizado",
+                var other => other
+            };
+            string text = $"{method} · {profile}";
+            if (IsEmbeddedEnvironmentVisible && SelectedEnvironmentTag == "Embedded") text += " · Integrado";
+            return text;
+        }
+    }
+
+    public string StartShortcutText => Settings.StartHotkey.ToString();
+    public string PauseShortcutText => Settings.PauseResumeHotkey.ToString();
+    public string PauseResumeLabel => State is TypingState.Pausado or TypingState.PausadoDestinoPerdido ? "Continuar" : "Pausar";
 
     public string SelectedEnvironmentTag
     {
@@ -268,6 +312,7 @@ public sealed class MainViewModel : ObservableObject
                 Settings.TargetEnvironment = normalized;
                 _settingsService.Save(Settings);
                 OnPropertyChanged(nameof(SelectedEnvironmentTag));
+                OnPropertyChanged(nameof(EngineSummaryText));
             }
         }
     }
@@ -288,19 +333,191 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(NextBlockLabel));
                 OnPropertyChanged(nameof(DigitarButtonText));
                 OnPropertyChanged(nameof(DigitarButtonWithShortcut));
+                NotifyPrimaryActionChanged();
                 CommandManager.InvalidateRequerySuggested();
             }
         }
     }
 
-    public bool IsSimpleQueueMode => !IsSmartEditorMode;
+    public bool IsSimpleQueueMode
+    {
+        get => !_isSmartEditorMode;
+        set => IsSmartEditorMode = !value;
+    }
 
     // --- Fila ---
     public bool HasNextBlock => IsSmartEditorMode
         ? (_docManager.SelectedBlock != null && _docManager.CurrentDocument != null && !string.IsNullOrEmpty(_docManager.SelectedBlock.GetText(_docManager.CurrentDocument.Text)))
         : (_queueService.Current is not null);
 
-    public bool CanStart => !IsBusy && HasNextBlock;
+    public bool CanStart => !IsBusy && HasPrimaryContent;
+
+    // --- Ação primária contextual (barra de execução) ---------------------------------------------
+    private string _editorSelectionText = string.Empty;
+
+    /// <summary>Texto atualmente selecionado no editor (alimentado pelo code-behind/binding do editor).</summary>
+    public string EditorSelectionText
+    {
+        get => _editorSelectionText;
+        set
+        {
+            value ??= string.Empty;
+            if (SetField(ref _editorSelectionText, value))
+            {
+                NotifyPrimaryActionChanged();
+            }
+        }
+    }
+
+    private bool HasActiveBlockContent =>
+        _docManager.SelectedBlock != null
+        && _docManager.CurrentDocument != null
+        && !string.IsNullOrEmpty(_docManager.SelectedBlock.GetText(_docManager.CurrentDocument.Text));
+
+    private bool HasDocumentContent => !string.IsNullOrEmpty(_docManager.CurrentDocument?.Text);
+
+    public ExecutionTarget CurrentExecutionTarget
+    {
+        get
+        {
+            if (!IsSmartEditorMode) return ExecutionTarget.Queue;
+
+            var doc = _docManager.CurrentDocument;
+            if (!string.IsNullOrEmpty(EditorSelectionText))
+            {
+                // Seleção idêntica ao bloco ativo (ex.: após clicar na estrutura) é tratada como bloco.
+                var sb = _docManager.SelectedBlock;
+                bool sameAsBlock = sb != null && doc != null
+                    && string.Equals(sb.GetText(doc.Text), EditorSelectionText, StringComparison.Ordinal);
+                if (!sameAsBlock) return ExecutionTarget.Selection;
+            }
+
+            if (_docManager.SelectedBlock != null && doc != null && doc.Blocks.Count > 1)
+                return ExecutionTarget.Block;
+
+            return ExecutionTarget.Document;
+        }
+    }
+
+    public bool HasPrimaryContent => CurrentExecutionTarget switch
+    {
+        ExecutionTarget.Queue => _queueService.Current is not null,
+        ExecutionTarget.Selection => true,
+        ExecutionTarget.Block => HasActiveBlockContent,
+        _ => HasDocumentContent
+    };
+
+    public bool CanStartPrimary => !IsBusy && HasPrimaryContent;
+
+    public bool CanStartDocument => !IsBusy && HasDocumentContent;
+    public bool CanStartBlock => !IsBusy && HasActiveBlockContent;
+    public bool CanStartSelection => !IsBusy && !string.IsNullOrEmpty(EditorSelectionText);
+
+    private static string Shorten(string s, int max) => s.Length > max ? s[..max] + "…" : s;
+
+    public string PrimaryActionTitle
+    {
+        get
+        {
+            switch (CurrentExecutionTarget)
+            {
+                case ExecutionTarget.Queue:
+                    var current = _queueService.Current;
+                    if (current is not null) return $"Digitar bloco {current.Order}";
+                    return _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent) ? "Fila enviada" : "Digitar";
+                case ExecutionTarget.Selection:
+                    return $"Digitar {EditorSelectionText.Length:N0} caracteres selecionados";
+                case ExecutionTarget.Block:
+                    return _docManager.SelectedBlock is { } sb
+                        ? $"Digitar bloco: {Shorten(sb.Title, 24)}"
+                        : "Digitar bloco";
+                default:
+                    return "Digitar documento";
+            }
+        }
+    }
+
+    public string PrimaryActionSubtitle
+    {
+        get
+        {
+            var doc = _docManager.CurrentDocument;
+            switch (CurrentExecutionTarget)
+            {
+                case ExecutionTarget.Queue:
+                    var current = _queueService.Current;
+                    return current is not null
+                        ? $"Fila · bloco {current.Order} de {_queueService.TotalBlocks}"
+                        : $"Fila · {_queueService.CompletedCount} de {_queueService.TotalBlocks} enviados";
+                case ExecutionTarget.Selection:
+                    return $"Seleção do editor · {EditorSelectionText.Length:N0} caracteres";
+                case ExecutionTarget.Block:
+                    if (_docManager.SelectedBlock is { } sb && doc != null)
+                        return $"{sb.LineRangeDisplay} · {sb.GetText(doc.Text).Length:N0} caracteres";
+                    return "Nenhum bloco selecionado";
+                default:
+                    return doc is null
+                        ? "Nenhum documento aberto"
+                        : $"{doc.Name} · {doc.CharacterCount:N0} caracteres";
+            }
+        }
+    }
+
+    /// <summary>Dica da ação primária: o que será enviado, ou o motivo de estar desabilitada.</summary>
+    public string PrimaryActionHint
+    {
+        get
+        {
+            if (IsBusy) return "Já existe uma digitação em andamento. Use Pausar ou Cancelar.";
+            if (HasPrimaryContent)
+                return $"{PrimaryActionTitle} ({PrimaryActionSubtitle}). Atalho: {Settings.StartHotkey}";
+
+            return CurrentExecutionTarget switch
+            {
+                ExecutionTarget.Queue => _queueService.Blocks.Any(b => b.Status == TextBlockStatus.Sent)
+                    ? "Todos os blocos já foram enviados. Reinicie a fila para digitar novamente."
+                    : "A fila está vazia. Adicione conteúdo a um bloco para habilitar.",
+                ExecutionTarget.Block => "O bloco selecionado está vazio. Selecione outro bloco na estrutura.",
+                _ => _docManager.HasDocument
+                    ? "O documento está vazio. Digite, cole ou abra um arquivo para habilitar."
+                    : "Nenhum documento aberto. Crie ou abra um documento."
+            };
+        }
+    }
+
+    public string DocumentActionLabel =>
+        _docManager.CurrentDocument is { } d ? $"Digitar documento ({d.CharacterCount:N0} caracteres)" : "Digitar documento";
+
+    public string BlockActionLabel =>
+        _docManager.SelectedBlock is { } sb ? $"Digitar bloco ativo: {Shorten(sb.Title, 28)}" : "Digitar bloco ativo";
+
+    public string SelectionActionLabel =>
+        string.IsNullOrEmpty(EditorSelectionText)
+            ? "Digitar seleção (nada selecionado)"
+            : $"Digitar seleção ({EditorSelectionText.Length:N0} caracteres)";
+
+    private void NotifyPrimaryActionChanged()
+    {
+        OnPropertyChanged(nameof(CurrentExecutionTarget));
+        OnPropertyChanged(nameof(HasPrimaryContent));
+        OnPropertyChanged(nameof(CanStart));
+        OnPropertyChanged(nameof(CanStartPrimary));
+        OnPropertyChanged(nameof(CanStartDocument));
+        OnPropertyChanged(nameof(CanStartBlock));
+        OnPropertyChanged(nameof(CanStartSelection));
+        OnPropertyChanged(nameof(PrimaryActionTitle));
+        OnPropertyChanged(nameof(PrimaryActionSubtitle));
+        OnPropertyChanged(nameof(PrimaryActionHint));
+        OnPropertyChanged(nameof(DocumentActionLabel));
+        OnPropertyChanged(nameof(BlockActionLabel));
+        OnPropertyChanged(nameof(SelectionActionLabel));
+
+        // StartCommand/StartDocumentCommand/... só existem após o construtor.
+        (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (StartDocumentCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (StartBlockCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (StartSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
 
     public string NextBlockLabel
     {
@@ -421,6 +638,7 @@ public sealed class MainViewModel : ObservableObject
     public ICommand StartCommand { get; }
     public ICommand StartDocumentCommand { get; }
     public ICommand StartSelectionCommand { get; }
+    public ICommand StartBlockCommand { get; }
     public ICommand PauseResumeCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand ClearHistoryCommand { get; }
@@ -470,7 +688,13 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnQueueChanged();
             }
+            else if (e.PropertyName is nameof(DocumentManager.HasPendingSplit))
+            {
+                // Edição de texto em andamento: atualiza rótulos/contagens sem esperar a divisão em blocos.
+                NotifyPrimaryActionChanged();
+            }
         };
+        _docManager.BlocksRefreshed += OnQueueChanged;
 
         LogLines = log.Lines;
         Settings = _settingsService.Load();
@@ -524,9 +748,13 @@ public sealed class MainViewModel : ObservableObject
             _log.Info(StatusMessage);
         };
 
-        StartCommand = new RelayCommand(async () => await StartAsync(), () => !IsBusy && HasNextBlock);
+        StartCommand = new RelayCommand(async () => await StartAsync(), () => !IsBusy && HasPrimaryContent);
         StartDocumentCommand = new RelayCommand(async () => await StartDocumentAsync(), () => !IsBusy && _docManager.HasDocument && !string.IsNullOrEmpty(_docManager.CurrentDocument?.Text));
-        StartSelectionCommand = new RelayCommand(async p => await StartSelectionAsync(p as string), p => !IsBusy && !string.IsNullOrEmpty(p as string));
+        StartBlockCommand = new RelayCommand(async () => await StartSmartBlockAsync(), () => !IsBusy && HasActiveBlockContent);
+        // O parâmetro (texto selecionado) é opcional: sem ele usa EditorSelectionText, mantido pelo editor.
+        StartSelectionCommand = new RelayCommand(
+            async p => await StartSelectionAsync(p as string ?? EditorSelectionText),
+            p => !IsBusy && !string.IsNullOrEmpty(p as string ?? EditorSelectionText));
         PauseResumeCommand = new RelayCommand(TogglePause, () => CanPause);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
         ClearHistoryCommand = new RelayCommand(() => { History.Clear(); _historyService.Save(History); });
@@ -568,6 +796,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(DigitarButtonWithShortcut));
         OnPropertyChanged(nameof(QueueSummary));
         OnPropertyChanged(nameof(QueueProgressLabel));
+        NotifyPrimaryActionChanged();
 
         (StartCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (SetAsNextCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -586,6 +815,9 @@ public sealed class MainViewModel : ObservableObject
         Settings = _settingsService.Load();
         ResumeCountdownSeconds = Settings.ResumeCountdownSeconds;
         OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(EngineSummaryText));
+        OnPropertyChanged(nameof(StartShortcutText));
+        OnPropertyChanged(nameof(PauseShortcutText));
         OnPropertyChanged(nameof(SelectedMethodTag));
         OnPropertyChanged(nameof(SelectedProfileTag));
         OnPropertyChanged(nameof(SelectedTargetLayoutTag));
@@ -630,7 +862,22 @@ public sealed class MainViewModel : ObservableObject
     {
         if (IsSmartEditorMode)
         {
-            await StartSmartBlockAsync().ConfigureAwait(true);
+            // Garante que os blocos reflitam o texto atual antes de decidir o que digitar.
+            _docManager.FlushPendingSplit();
+
+            // O mesmo critério do rótulo do botão primário: o atalho global nunca digita algo diferente do exibido.
+            switch (CurrentExecutionTarget)
+            {
+                case ExecutionTarget.Selection:
+                    await StartSelectionAsync(EditorSelectionText).ConfigureAwait(true);
+                    break;
+                case ExecutionTarget.Block:
+                    await StartSmartBlockAsync().ConfigureAwait(true);
+                    break;
+                default:
+                    await StartDocumentAsync().ConfigureAwait(true);
+                    break;
+            }
         }
         else
         {
@@ -640,6 +887,7 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task StartDocumentAsync()
     {
+        _docManager.FlushPendingSplit();
         if (_docManager.CurrentDocument is not { } doc || string.IsNullOrEmpty(doc.Text))
         {
             StatusMessage = "Nenhum documento aberto com conteúdo.";
@@ -656,7 +904,12 @@ public sealed class MainViewModel : ObservableObject
         _activeLease = lease;
         try
         {
-            await TypeTextPayloadAsync(doc.Text, $"Documento completo '{doc.Name}'", lease).ConfigureAwait(true);
+            bool ok = await TypeTextPayloadAsync(doc.Text, $"Documento completo '{doc.Name}'", lease).ConfigureAwait(true);
+            if (ok)
+            {
+                // O documento inteiro foi enviado: todos os blocos derivados dele também.
+                foreach (var b in doc.Blocks) b.Status = TextBlockStatus.Sent;
+            }
         }
         finally
         {
@@ -692,6 +945,7 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task StartSmartBlockAsync()
     {
+        _docManager.FlushPendingSplit();
         if (_docManager.SelectedBlock is not { } block || _docManager.CurrentDocument is not { } doc)
         {
             StatusMessage = "Selecione um bloco inteligente para digitar.";

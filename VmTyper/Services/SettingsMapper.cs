@@ -38,6 +38,7 @@ public sealed class SettingsFormState
     public bool StartMinimized { get; set; }
     public bool AlwaysOnTop { get; set; }
     public bool ClearTextAfterCompletion { get; set; }
+    public AppTheme Theme { get; set; } = AppTheme.Auto;
 }
 
 public sealed record SettingsValidationResult(
@@ -87,7 +88,8 @@ public static class SettingsMapper
             MinimizeToTray = s.MinimizeToTray,
             StartMinimized = s.StartMinimized,
             AlwaysOnTop = s.AlwaysOnTop,
-            ClearTextAfterCompletion = s.ClearTextAfterCompletion
+            ClearTextAfterCompletion = s.ClearTextAfterCompletion,
+            Theme = s.Theme
         };
     }
 
@@ -201,6 +203,7 @@ public static class SettingsMapper
         result.StartMinimized = form.StartMinimized;
         result.AlwaysOnTop = form.AlwaysOnTop;
         result.ClearTextAfterCompletion = form.ClearTextAfterCompletion;
+        result.Theme = form.Theme;
 
         return new SettingsValidationResult(true, result, errors, warnings);
     }
@@ -273,6 +276,7 @@ public static class SettingsMapper
         MinimizeToTray = s.MinimizeToTray,
         StartMinimized = s.StartMinimized,
         AlwaysOnTop = s.AlwaysOnTop,
-        ClearTextAfterCompletion = s.ClearTextAfterCompletion
+        ClearTextAfterCompletion = s.ClearTextAfterCompletion,
+        Theme = s.Theme
     };
 }

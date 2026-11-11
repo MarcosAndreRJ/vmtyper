@@ -1,0 +1,109 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- VmTyper 2.0 — paleta ESCURA. Referências do briefing: #0F1117 / #171B24 / #202633 / #303848 / #E6EAF2 / #9AA8BA / #4C8DFF -->
+    <Color x:Key="AppBackgroundColor">#0F1117</Color>
+    <Color x:Key="SurfaceColor">#171B24</Color>
+    <Color x:Key="SurfaceElevatedColor">#202633</Color>
+    <Color x:Key="SurfaceHoverColor">#283042</Color>
+    <Color x:Key="SurfaceActiveColor">#2F384C</Color>
+    <Color x:Key="BorderColor">#303848</Color>
+    <Color x:Key="BorderSubtleColor">#222938</Color>
+    <Color x:Key="ControlBorderColor">#3B465A</Color>
+
+    <Color x:Key="TextPrimaryColor">#E6EAF2</Color>
+    <Color x:Key="TextSecondaryColor">#9AA8BA</Color>
+    <Color x:Key="TextMutedColor">#7A879A</Color>
+    <Color x:Key="TextDisabledColor">#4F5A6C</Color>
+
+    <Color x:Key="AccentColor">#4C8DFF</Color>
+    <Color x:Key="AccentHoverColor">#6BA1FF</Color>
+    <Color x:Key="AccentPressedColor">#3B7BEA</Color>
+    <Color x:Key="AccentSubtleColor">#1B2740</Color>
+    <Color x:Key="AccentFillColor">#2F6FEB</Color>
+    <Color x:Key="AccentFillHoverColor">#4C8DFF</Color>
+    <Color x:Key="AccentFillPressedColor">#2459C4</Color>
+
+    <Color x:Key="SuccessColor">#34D399</Color>
+    <Color x:Key="SuccessBackgroundColor">#0E2F25</Color>
+    <Color x:Key="SuccessTextColor">#6EE7B7</Color>
+
+    <Color x:Key="WarningColor">#F5B544</Color>
+    <Color x:Key="WarningBackgroundColor">#33260C</Color>
+    <Color x:Key="WarningTextColor">#FCD34D</Color>
+
+    <Color x:Key="DangerColor">#F26B6B</Color>
+    <Color x:Key="DangerBackgroundColor">#3A1618</Color>
+    <Color x:Key="DangerTextColor">#FCA5A5</Color>
+
+    <Color x:Key="InfoColor">#38B6F2</Color>
+    <Color x:Key="InfoBackgroundColor">#0C2A3D</Color>
+    <Color x:Key="InfoTextColor">#7DD3FC</Color>
+
+    <Color x:Key="ScrollThumbColor">#3A4358</Color>
+    <Color x:Key="ScrollThumbHoverColor">#56637C</Color>
+
+    <!-- Pincéis semânticos -->
+    <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceElevatedBrush" Color="{StaticResource SurfaceElevatedColor}"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="SurfaceActiveBrush" Color="{StaticResource SurfaceActiveColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}"/>
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="{StaticResource ControlBorderColor}"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}"/>
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}"/>
+    <SolidColorBrush x:Key="AccentSubtleBrush" Color="{StaticResource AccentSubtleColor}"/>
+    <SolidColorBrush x:Key="AccentFillBrush" Color="{StaticResource AccentFillColor}"/>
+    <SolidColorBrush x:Key="AccentFillHoverBrush" Color="{StaticResource AccentFillHoverColor}"/>
+    <SolidColorBrush x:Key="AccentFillPressedBrush" Color="{StaticResource AccentFillPressedColor}"/>
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="{StaticResource SuccessBackgroundColor}"/>
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="{StaticResource SuccessTextColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="WarningBackgroundBrush" Color="{StaticResource WarningBackgroundColor}"/>
+    <SolidColorBrush x:Key="WarningTextBrush" Color="{StaticResource WarningTextColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="DangerBackgroundBrush" Color="{StaticResource DangerBackgroundColor}"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="{StaticResource DangerTextColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+    <SolidColorBrush x:Key="InfoBackgroundBrush" Color="{StaticResource InfoBackgroundColor}"/>
+    <SolidColorBrush x:Key="InfoTextBrush" Color="{StaticResource InfoTextColor}"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="{StaticResource ScrollThumbColor}"/>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="{StaticResource ScrollThumbHoverColor}"/>
+
+    <!-- Compatibilidade com nomes legados -->
+    <SolidColorBrush x:Key="WarnBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="OkBrush" Color="{StaticResource SuccessColor}"/>
+
+    <!-- Editor (AvalonEdit) -->
+    <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#131720"/>
+    <SolidColorBrush x:Key="EditorForegroundBrush" Color="#D6DCE8"/>
+    <SolidColorBrush x:Key="EditorLineNumberBrush" Color="#5A667B"/>
+    <SolidColorBrush x:Key="EditorCurrentLineBrush" Color="#1B2232"/>
+    <SolidColorBrush x:Key="EditorCurrentLineBorderBrush" Color="#2A3350"/>
+    <SolidColorBrush x:Key="EditorSelectionBrush" Color="#2B4A85"/>
+    <SolidColorBrush x:Key="EditorCaretBrush" Color="#E6EAF2"/>
+    <SolidColorBrush x:Key="EditorMarkerBrush" Color="#7A5C1E"/>
+
+    <!-- Cores de sistema redirecionadas ao tema: templates padrão (painel de busca do AvalonEdit, DataGrid,
+         estilos padrão do WPF) resolvem estas chaves por DynamicResource e, sem isto, ficariam claros no tema escuro. -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="{StaticResource SurfaceElevatedColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="{StaticResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="{StaticResource ControlBorderColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="{StaticResource TextDisabledColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{StaticResource AccentFillColor}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+</ResourceDictionary>

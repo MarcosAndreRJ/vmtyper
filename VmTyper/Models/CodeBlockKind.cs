@@ -26,3 +26,4 @@ public enum CodeBlockKind
     CustomSelection,
     Unclassified
 }
+

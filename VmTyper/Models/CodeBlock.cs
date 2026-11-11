@@ -89,7 +89,41 @@ public sealed class CodeBlock : ObservableObject
         set => SetField(ref _warningMessage, value);
     }
 
+    private bool _isSelected;
+    [JsonIgnore]
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetField(ref _isSelected, value);
+    }
+
     public string LineRangeDisplay => StartLine == EndLine ? $"L{StartLine}" : $"L{StartLine}–L{EndLine}";
+
+    /// <summary>Rótulo curto, em português, do tipo estrutural (usado no navegador de estrutura).</summary>
+    [JsonIgnore]
+    public string KindLabel => Kind switch
+    {
+        CodeBlockKind.FullDocument => "Documento",
+        CodeBlockKind.DelphiUnitHeader => "Cabeçalho da unit",
+        CodeBlockKind.DelphiInterface => "Interface",
+        CodeBlockKind.DelphiUses => "Uses",
+        CodeBlockKind.DelphiTypeSection => "Types",
+        CodeBlockKind.DelphiConstSection => "Const",
+        CodeBlockKind.DelphiVarSection => "Var",
+        CodeBlockKind.DelphiImplementation => "Implementation",
+        CodeBlockKind.DelphiMethod => "Método",
+        CodeBlockKind.DelphiInitialization => "Initialization",
+        CodeBlockKind.DelphiFinalization => "Finalization",
+        CodeBlockKind.DelphiUnitEnd => "Fim da unit",
+        CodeBlockKind.SqlCommand => "Comando SQL",
+        CodeBlockKind.SqlDdl => "DDL",
+        CodeBlockKind.SqlProcedure => "Procedure",
+        CodeBlockKind.SqlTrigger => "Trigger",
+        CodeBlockKind.SqlExecuteBlock => "Execute block",
+        CodeBlockKind.SqlSetTerm => "SET TERM",
+        CodeBlockKind.CustomSelection => "Seleção manual",
+        _ => "Bloco"
+    };
 
     public string GetText(string documentText)
     {
@@ -99,3 +133,4 @@ public sealed class CodeBlock : ObservableObject
         return documentText.Substring(start, end - start);
     }
 }
+

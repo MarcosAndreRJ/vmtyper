@@ -122,4 +122,7 @@ public sealed class AppSettings
     public bool StartMinimized { get; set; }
     public bool AlwaysOnTop { get; set; }
     public bool ClearTextAfterCompletion { get; set; }
+
+    // --- Aparência ---
+    public AppTheme Theme { get; set; } = AppTheme.Auto;
 }
