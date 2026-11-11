@@ -481,3 +481,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 rea/
+
+# Saída de publicação local
+dist/
