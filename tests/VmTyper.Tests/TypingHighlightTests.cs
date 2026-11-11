@@ -58,3 +58,37 @@ public sealed class TypingHighlightTests
         Assert.Equal(expectedLength, length);
     }
 }
+
+[Trait("Category", "Unit")]
+public sealed class QueueTypingHighlightTests
+{
+    [Fact]
+    public async Task QueueBlock_HighlightsEachWordWhileTyping_AndClearsAtTheEnd()
+    {
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        using var harness = new EngineHarness();
+        var settingsSvc = new SettingsService(dir.File("settings.json"));
+        settingsSvc.Save(new AppSettings { CountdownSeconds = 0, CharDelayMs = 0, EnterDelayMs = 0, EnableTargetGuard = false });
+
+        var queue = new TypingQueueService(log, new InMemoryQueueStore(), new ManualAutoSaveScheduler());
+        queue.Blocks[0].Text = "ola mundo";
+        var hotkeys = new FakeHotkeyRegistrar();
+        var vm = new MainViewModel(
+            harness.Engine, new ActiveWindowService(), settingsSvc, new HistoryService(dir.File("history.json")),
+            hotkeys, queue, log, new TypingSessionCoordinator(hotkeys, log), (_, _) => Task.CompletedTask);
+
+        var block = queue.Blocks[0];
+        var seen = new List<TextHighlight>();
+        block.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TextBlockItem.TypingHighlight) && block.TypingHighlight is { } h) seen.Add(h);
+        };
+
+        await vm.StartQueueBlockAsync();
+
+        Assert.Contains(new TextHighlight(0, 3), seen);   // "ola"
+        Assert.Contains(new TextHighlight(4, 5), seen);   // "mundo"
+        Assert.Null(block.TypingHighlight);
+    }
+}

@@ -1023,9 +1023,9 @@ public sealed class MainViewModel : ObservableObject
         return (start, end - start);
     }
 
-    private Helpers.DirectProgress<TypingProgress> CreateProgress(string payload, PreflightReport preflight, int sourceBase)
+    private Helpers.DirectProgress<TypingProgress> CreateProgress(string payload, PreflightReport preflight, int sourceBase, Action<int, int>? highlight)
     {
-        if (sourceBase < 0)
+        if (sourceBase < 0 || highlight is null)
         {
             return new Helpers.DirectProgress<TypingProgress>(OnProgress);
         }
@@ -1041,7 +1041,7 @@ public sealed class MainViewModel : ObservableObject
             int rawStart = map[unit.SourceStart];
             int rawEnd = map[Math.Min(unit.SourceStart + Math.Max(1, unit.SourceLength), map.Length - 1)];
             var (start, len) = ExpandToWord(payload, rawStart, rawEnd - rawStart);
-            TypingHighlightChanged?.Invoke(start < 0 ? -1 : sourceBase + start, len);
+            highlight(start < 0 ? -1 : sourceBase + start, len);
         });
     }
 
@@ -1058,6 +1058,7 @@ public sealed class MainViewModel : ObservableObject
         _log.Info($"Sessão iniciada: {description}");
         _log.Info($"Método: {Settings.Method}");
         _log.Info($"Caracteres: {textToType.Length}");
+        _log.Info($"Substituições configuradas: {Settings.CharacterSubstitutions.Count}");
 
         try
         {
@@ -1144,7 +1145,7 @@ public sealed class MainViewModel : ObservableObject
                     : null
             };
 
-            var progress = CreateProgress(textToType, preflight, sourceBase);
+            var progress = CreateProgress(textToType, preflight, sourceBase, (s, l) => TypingHighlightChanged?.Invoke(s, l));
 
             _log.Info("Digitação iniciada");
             await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token).ConfigureAwait(true);
@@ -1276,6 +1277,7 @@ public sealed class MainViewModel : ObservableObject
         _log.Info($"Bloco: {blockOrder} (Id={blockId})");
         _log.Info($"Método: {Settings.Method}");
         _log.Info($"Caracteres: {textToType.Length}");
+        _log.Info($"Substituições configuradas: {Settings.CharacterSubstitutions.Count}");
 
         bool typingStarted = false;
         try
@@ -1380,7 +1382,8 @@ public sealed class MainViewModel : ObservableObject
                     : null
             };
 
-            var progress = new Helpers.DirectProgress<TypingProgress>(OnProgress);
+            var progress = CreateProgress(textToType, preflight, resumeFromIndex > 0 ? resumeFromIndex : 0,
+                (s, l) => next.TypingHighlight = s < 0 ? null : new TextHighlight(s, l));
 
             _log.Info("Digitação iniciada");
             await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token)
@@ -1443,6 +1446,7 @@ public sealed class MainViewModel : ObservableObject
             _targetGuard.StopMonitoring();
             OnPropertyChanged(nameof(TargetIndicatorText));
             _activeBlockId = null;
+            next.TypingHighlight = null;
         }
     }
 

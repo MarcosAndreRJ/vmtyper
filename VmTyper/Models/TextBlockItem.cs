@@ -41,6 +41,16 @@ public sealed class TextBlockItem : ObservableObject
         }
     }
 
+    private TextHighlight? _typingHighlight;
+
+    /// <summary>Trecho do texto que está sendo digitado agora (somente em memória).</summary>
+    [JsonIgnore]
+    public TextHighlight? TypingHighlight
+    {
+        get => _typingHighlight;
+        set => SetField(ref _typingHighlight, value);
+    }
+
     private TextBlockStatus _status = TextBlockStatus.Empty;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
