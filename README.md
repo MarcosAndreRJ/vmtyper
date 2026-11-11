@@ -71,6 +71,8 @@ dotnet test VmTyper.sln -c Release --no-build --filter "Category=Unit"
 O executável gerado localiza-se em:
 `VmTyper\bin\x64\Release\net10.0-windows\VmTyper.exe`
 
+A versão para uso é sempre disponibilizada em `VmTyper\bin\x64\` (`VmTyper.exe` autocontido e `VmTyper-win-x64.zip`); veja [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md), seção 2.3.
+
 ---
 
 ## 5. Testes e Validação
