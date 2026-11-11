@@ -8,6 +8,11 @@ namespace VmTyper.Models;
 /// </summary>
 public sealed class TypingSession
 {
+    public Guid SessionId { get; set; } = Guid.NewGuid();
+
+    /// <summary>Identidade estável do bloco. Guid.Empty apenas para registros v1 antigos.</summary>
+    public Guid BlockId { get; set; }
+
     public DateTime StartedAt { get; set; }
 
     /// <summary>Número do bloco (posição visual) no momento da execução. 0 = desconhecido (registros antigos).</summary>
@@ -16,6 +21,9 @@ public sealed class TypingSession
     public int CharacterCount { get; set; }
     public bool Completed { get; set; }
     public double DurationSeconds { get; set; }
+
+    /// <summary>Métricas numéricas da sessão (Fase 2 §5), sem qualquer texto digitado.</summary>
+    public SessionMetrics? Metrics { get; set; }
 
     public string StatusText => Completed ? "Concluído" : "Cancelado";
 

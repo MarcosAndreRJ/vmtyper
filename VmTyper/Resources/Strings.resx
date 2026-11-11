@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppTitle" xml:space="preserve">
+    <value>VmTyper — Digitação automatizada para VM via navegador</value>
+  </data>
+  <data name="ReceiptUnverifiedSuffix" xml:space="preserve">
+    <value>Recebimento não verificado.</value>
+  </data>
+  <data name="BlockSentTemplate" xml:space="preserve">
+    <value>Bloco {0}: {1:N0} unidades enviadas. Recebimento não verificado.</value>
+  </data>
+  <data name="BlockPartialSentTemplate" xml:space="preserve">
+    <value>Bloco {0} enviado parcialmente ({1:N0} enviadas, {2:N0} puladas, {3:N0} falhas). Recebimento não verificado.</value>
+  </data>
+  <data name="DeliverySentLabel" xml:space="preserve">
+    <value>↗ Enviado</value>
+  </data>
+  <data name="DeliveryConfirmedLabel" xml:space="preserve">
+    <value>✓ Confirmado</value>
+  </data>
+  <data name="DeliverySuspiciousLabel" xml:space="preserve">
+    <value>⚠ Suspeito</value>
+  </data>
+  <data name="DeliveryUnknownLabel" xml:space="preserve">
+    <value>? Desconhecido</value>
+  </data>
+  <data name="DeliveryFailedLabel" xml:space="preserve">
+    <value>✗ Falha</value>
+  </data>
+  <data name="TargetGuardMonitoring" xml:space="preserve">
+    <value>🛡 Monitorando</value>
+  </data>
+  <data name="TargetGuardLost" xml:space="preserve">
+    <value>⚠ Perdido</value>
+  </data>
+  <data name="TargetGuardOff" xml:space="preserve">
+    <value>○ Desligado</value>
+  </data>
+  <data name="EnvironmentExternal" xml:space="preserve">
+    <value>Externo</value>
+  </data>
+  <data name="EnvironmentEmbedded" xml:space="preserve">
+    <value>Integrado (experimental)</value>
+  </data>
+</root>

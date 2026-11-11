@@ -1,0 +1,607 @@
+﻿{
+  "generatedAtUtc": "2026-11-10T00:49:55.0737877Z",
+  "corpus": "repetidas.txt",
+  "repetitionsPerCell": 5,
+  "sweeps": [
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 0,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 0,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 0,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 0,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 0,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 3,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 3,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 3,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 3,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 3,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 10,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 10,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 10,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 10,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 20,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 10,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 30,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 30,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 50,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 2,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 15,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 60,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 0,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 20,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    },
+    {
+      "corpus": "repetidas.txt",
+      "gapMs": 60,
+      "holdMs": 120,
+      "sameKeyMinGapMs": 50,
+      "repetitions": 5,
+      "effectiveMeanSameKeyGapMs": 60,
+      "duplications": 0,
+      "omissions": 0
+    }
+  ]
+}

@@ -28,13 +28,31 @@ public sealed class TrayIconService : IDisposable
 
         _notifyIcon = new NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = LoadAppIcon(),
             Text = "VmTyper",
             Visible = false,
             ContextMenuStrip = menu
         };
 
         _notifyIcon.DoubleClick += (_, _) => OpenRequested?.Invoke();
+    }
+
+    /// <summary>Ícone do próprio executável (ApplicationIcon); se indisponível, o ícone genérico do sistema.</summary>
+    private static System.Drawing.Icon LoadAppIcon()
+    {
+        try
+        {
+            string? exe = Environment.ProcessPath;
+            if (exe is not null && System.Drawing.Icon.ExtractAssociatedIcon(exe) is { } icon)
+            {
+                return icon;
+            }
+        }
+        catch
+        {
+            // Cai no ícone genérico.
+        }
+        return System.Drawing.SystemIcons.Application;
     }
 
     public bool Visible

@@ -3,124 +3,231 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:models="clr-namespace:VmTyper.Models"
         xmlns:helpers="clr-namespace:VmTyper.Helpers"
+        xmlns:services="clr-namespace:VmTyper.Services"
         Title="Configurações — VmTyper"
-        Width="560" Height="600" MinWidth="500" MinHeight="480"
+        Style="{StaticResource AppWindowStyle}"
+        Width="920" Height="680" MinWidth="760" MinHeight="560"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Background="{DynamicResource AppBackgroundBrush}">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
-            <!-- Digitação -->
-            <TabItem Header="Digitação">
-                <StackPanel Margin="10">
-                    <TextBlock Text="Presets de velocidade" FontWeight="Bold" Margin="0,0,0,6"/>
-                    <WrapPanel Margin="0,0,0,10">
-                        <Button Content="Instantâneo" Click="PresetInstantaneo_Click"/>
-                        <Button Content="Muito rápido" Click="PresetMuitoRapido_Click"/>
-                        <Button Content="Rápido" Click="PresetRapido_Click"/>
-                        <Button Content="Normal" Click="PresetNormal_Click"/>
-                        <Button Content="Compatibilidade" Click="PresetCompatibilidade_Click"/>
-                    </WrapPanel>
+        <TabControl Grid.Row="0" x:Name="SettingsTabs">
+            <!-- 1. Digitação -->
+            <TabItem Header="Digitação" Tag="Digitacao">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Presets de velocidade (perfil Legado)" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <WrapPanel Margin="0,0,0,10">
+                            <Button Content="Instantâneo" Click="PresetInstantaneo_Click" AutomationProperties.Name="Preset Instantâneo"/>
+                            <Button Content="Muito rápido" Click="PresetMuitoRapido_Click" AutomationProperties.Name="Preset Muito rápido"/>
+                            <Button Content="Rápido" Click="PresetRapido_Click" AutomationProperties.Name="Preset Rápido"/>
+                            <Button Content="Normal" Click="PresetNormal_Click" AutomationProperties.Name="Preset Normal"/>
+                            <Button Content="Compatibilidade" Click="PresetCompatibilidade_Click" AutomationProperties.Name="Preset Compatibilidade"/>
+                        </WrapPanel>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="120"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
-                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" MinHeight="36"/>
+                                <RowDefinition Height="Auto" MinHeight="36"/>
+                                <RowDefinition Height="Auto" MinHeight="36"/>
+                            </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Intervalo entre caracteres (ms):" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="CharDelayBox"/>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Intervalo entre caracteres (0–2000 ms):" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CharDelayText, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                     AutomationProperties.Name="Intervalo entre caracteres em milissegundos"/>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Intervalo após Enter (ms):" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="EnterDelayBox"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Intervalo após Enter (0–2000 ms):" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EnterDelayText, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                     AutomationProperties.Name="Intervalo após Enter em milissegundos"/>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Contagem regressiva (segundos):" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="CountdownBox"/>
-                    </Grid>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Contagem regressiva (0–30 segundos):" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CountdownText, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                     AutomationProperties.Name="Contagem regressiva em segundos"/>
+                        </Grid>
 
-                    <TextBlock Text="Método de digitação" FontWeight="Bold" Margin="0,16,0,6"/>
-                    <ComboBox x:Name="MethodCombo">
-                        <ComboBoxItem Content="Automático (recomendado)" Tag="Automatico"/>
-                        <ComboBoxItem Content="Teclado físico (Virtual Key + Scan Code)" Tag="TecladoFisico"/>
-                        <ComboBoxItem Content="Unicode (KEYEVENTF_UNICODE)" Tag="Unicode"/>
-                    </ComboBox>
-                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                        Automático: usa Teclado Físico e cai para Unicode apenas nos caracteres não suportados pelo layout ativo.
-                        Teclado Físico: reproduz teclas reais (mais compatível com consoles VMware HTML5, que costumam encaminhar eventos de teclado físico à VM).
-                        Unicode: injeta o caractere diretamente, ignorando o layout; pode não funcionar em todos os consoles VMware.
-                    </TextBlock>
+                        <CheckBox Content="Habilitar perfis de temporização adaptativa (AdaptiveTiming)"
+                                  IsChecked="{Binding AdaptiveTiming, Mode=TwoWay}" Margin="0,12,0,6"
+                                  AutomationProperties.Name="Habilitar perfis de temporização adaptativa"/>
 
-                    <CheckBox x:Name="PreserveIndentationCheck" Content="Preservar indentação original" Margin="0,16,0,4"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                        Ao iniciar uma nova linha, remove a autoindentação do editor de destino (Shift+Home, Delete) e reaplica a indentação existente no texto original. Recomendado para editores de código como o Delphi IDE, que auto-indentam após Enter. Teste em um arquivo descartável antes de usar em código real — o VmTyper não tem como confirmar que o reset de cursor funcionou no seu editor específico.
-                    </TextBlock>
-                </StackPanel>
+                        <TextBlock Text="Perfil de temporização" FontWeight="Bold" Margin="0,2,0,4"/>
+                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TypingProfileTag, Mode=TwoWay}"
+                                  AutomationProperties.Name="Perfil de temporização">
+                            <ComboBoxItem Content="Legado (padrão — usa intervalos fixos acima)" Tag="Legacy"/>
+                            <ComboBoxItem Content="Rápido (Hold 2–4 ms, Gap 3–8 ms)" Tag="Fast"/>
+                            <ComboBoxItem Content="Compatibilidade VM (Hold 8–15 ms, Gap 25–40 ms)" Tag="Compatibility"/>
+                            <ComboBoxItem Content="Natural (Hold 30–60 ms, Gap 60–180 ms, correlacionado)" Tag="Natural"/>
+                            <ComboBoxItem Content="Personalizado (Custom)" Tag="Custom"/>
+                        </ComboBox>
+
+                        <!-- Editor do perfil Personalizado (§3) -->
+                        <GroupBox Header="Editor do Perfil Personalizado (F2 §2)" Margin="0,8,0,6" Padding="8">
+                            <GroupBox.Style>
+                                <Style TargetType="GroupBox">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCustomProfileSelected}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </GroupBox.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Hold Min/Max (1–500 ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CustomHoldMinText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+                                <TextBox Grid.Row="0" Grid.Column="2" Text="{Binding CustomHoldMaxText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="0" Grid.Column="4" Text="Penalidade mesma tecla (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="0" Grid.Column="5" Text="{Binding CustomSameKeyPenaltyText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Gap Min/Max (0–2000 ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CustomGapMinText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+                                <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding CustomGapMaxText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="4" Text="Lead modificador (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="1" Grid.Column="5" Text="{Binding CustomModifierLeadText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Enter Gap Min/Max (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CustomEnterGapMinText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+                                <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding CustomEnterGapMaxText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="4" Text="Lead tecla morta (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="2" Grid.Column="5" Text="{Binding CustomDeadKeyLeadText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Burst Pause Min/Max (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CustomBurstPauseMinText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+                                <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding CustomBurstPauseMaxText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="4" Text="Pausa indentação (ms):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="3" Grid.Column="5" Text="{Binding CustomLineIndentPauseText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Tamanho Burst (0=off):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding CustomBurstLengthText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="4" Text="Correlação Alpha (0–0.9):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="4" Grid.Column="5" Text="{Binding CustomCorrelationAlphaText, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- Prévia dry-run -->
+                        <Border Background="{DynamicResource InfoBackgroundBrush}" BorderBrush="{DynamicResource InfoBrush}" BorderThickness="1" CornerRadius="3" Padding="6" Margin="0,6,0,6">
+                            <TextBlock Text="{Binding DryRunPreviewText}" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12" Foreground="{DynamicResource InfoTextBrush}"/>
+                        </Border>
+
+                        <TextBlock Text="Método de digitação" FontWeight="Bold" Margin="0,10,0,4"/>
+                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding MethodTag, Mode=TwoWay}"
+                                  AutomationProperties.Name="Método de digitação">
+                            <ComboBoxItem Content="Automático (recomendado)" Tag="Automatico"/>
+                            <ComboBoxItem Content="Teclado físico (Virtual Key + Scan Code)" Tag="TecladoFisico"/>
+                            <ComboBoxItem Content="Unicode (KEYEVENTF_UNICODE)" Tag="Unicode"/>
+                        </ComboBox>
+
+                        <TextBlock Text="Layout de teclado de destino" FontWeight="Bold" Margin="0,12,0,4"/>
+                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TargetLayoutTag, Mode=TwoWay}" IsEditable="True"
+                                  AutomationProperties.Name="Layout de teclado de destino">
+                            <ComboBoxItem Content="Mesmo da janela ativa no host (HostForeground)" Tag="HostForeground"/>
+                            <ComboBoxItem Content="Português (Brasil ABNT2 — 00010416)" Tag="00010416"/>
+                            <ComboBoxItem Content="Inglês (US-International — 00020409)" Tag="00020409"/>
+                            <ComboBoxItem Content="Inglês (US — 00000409)" Tag="00000409"/>
+                        </ComboBox>
+
+                        <CheckBox Content="Preservar indentação original" IsChecked="{Binding PreserveOriginalIndentation, Mode=TwoWay}"
+                                  Margin="0,12,0,4" AutomationProperties.Name="Preservar indentação original"/>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
-            <!-- Atalhos -->
-            <TabItem Header="Atalhos">
+            <!-- 2. Segurança de foco -->
+            <TabItem Header="Segurança de foco" Tag="Seguranca">
                 <StackPanel Margin="10">
-                    <TextBlock Text="Iniciar digitação" FontWeight="Bold"/>
-                    <DockPanel Margin="0,4,0,14">
-                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CaptureStartHotkey_Click"/>
-                        <TextBox x:Name="StartHotkeyBox" IsReadOnly="True"/>
-                    </DockPanel>
-
-                    <TextBlock Text="Pausar / Continuar" FontWeight="Bold"/>
-                    <DockPanel Margin="0,4,0,14">
-                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CapturePauseHotkey_Click"/>
-                        <TextBox x:Name="PauseHotkeyBox" IsReadOnly="True"/>
-                    </DockPanel>
-
-                    <TextBlock Text="Cancelar (emergência)" FontWeight="Bold"/>
-                    <TextBox Text="ESC (fixo, ativo somente durante a digitação)" IsReadOnly="True" Margin="0,4,0,0" Background="#EEEEEE"/>
-
-                    <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                        Clique em "Capturar" e pressione a combinação desejada (ex.: Ctrl+Shift+Enter). Use pelo menos um modificador (Ctrl, Shift ou Alt).
+                    <CheckBox Content="Monitorar janela de destino durante a digitação (TargetGuard por HWND)"
+                              IsChecked="{Binding EnableTargetGuard, Mode=TwoWay}" Margin="0,0,0,6"
+                              AutomationProperties.Name="Monitorar janela de destino"/>
+                    <CheckBox Content="Modo estrito: pausar também se o título da janela mudar (troca de aba)"
+                              IsChecked="{Binding TargetGuardStrict, Mode=TwoWay}" Margin="18,0,0,10"
+                              AutomationProperties.Name="Modo estrito do TargetGuard"/>
+                    <TextBlock Margin="0,0,0,14" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        Quando ligado (padrão), pausa automaticamente a sessão se a janela de topo perder o foco no meio do envio. Limitações: o guard detecta troca de janela de topo no host; não detecta troca de aba sem mudança de título, foco em outro frame/campo da página nem se a VM está com o foco interno no campo certo.
                     </TextBlock>
-                </StackPanel>
-            </TabItem>
 
-            <!-- Segurança -->
-            <TabItem Header="Segurança">
-                <StackPanel Margin="10">
-                    <CheckBox x:Name="ValidateWindowCheck" Content="Validar navegador de destino antes de digitar" Margin="0,0,0,10"/>
+                    <CheckBox Content="Exigir navegador específico antes de iniciar"
+                              IsChecked="{Binding ValidateTargetWindow, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Exigir navegador específico"/>
                     <TextBlock Text="Navegador esperado:" Margin="0,0,0,4"/>
-                    <ComboBox x:Name="ExpectedBrowserCombo">
+                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding ExpectedBrowserTag, Mode=TwoWay}"
+                              AutomationProperties.Name="Navegador esperado">
                         <ComboBoxItem Content="Nenhum (não validar)" Tag="Nenhum"/>
                         <ComboBoxItem Content="Google Chrome" Tag="Chrome"/>
                         <ComboBoxItem Content="Microsoft Edge" Tag="Edge"/>
                         <ComboBoxItem Content="Firefox" Tag="Firefox"/>
                     </ComboBox>
-                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                        Antes de iniciar a digitação (após a contagem regressiva), o aplicativo verifica se a janela em primeiro plano do host pertence ao navegador configurado. O Notepad dentro da VM não é uma janela real do Windows host, portanto a validação é feita sobre o navegador.
-                    </TextBlock>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Contagem regressiva de retomada após perda de foco (0–30 s):" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding ResumeCountdownText, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                 AutomationProperties.Name="Contagem regressiva de retomada"/>
+                    </Grid>
                 </StackPanel>
             </TabItem>
 
-            <!-- Substituições de caracteres -->
-            <TabItem Header="Substituições">
+            <!-- 3. Substituições -->
+            <TabItem Header="Substituições" Tag="Substituicoes">
                 <DockPanel Margin="10">
-                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10">
-                        Se a VM de destino digita algum símbolo errado (layout de teclado desconfigurado), cadastre aqui o caractere original ("De") e o que deve ser digitado no lugar. Pode ser um texto simples (digitado pelo caminho normal) ou uma combinação de teclas física exata — útil quando a VM interpreta um modificador (ex.: Shift) de forma diferente dependendo da tecla física, mesmo com o Shift corretamente pressionado.
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8">
+                        Se a VM de destino digita algum símbolo errado (layout de teclado desconfigurado), cadastre aqui o caractere original ("De") e o que deve ser digitado no lugar. Aplicado em passada única (sem encadeamento).
                     </TextBlock>
 
-                    <Button DockPanel.Dock="Bottom" Content="+ Adicionar substituição" Click="AddSubstitution_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                    <Border DockPanel.Dock="Top" Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" CornerRadius="3" Padding="6" Margin="0,0,0,8">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasDuplicateSubstitutionsWarning}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding DuplicateSubstitutionsWarning}" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontSize="12"/>
+                    </Border>
+
+                    <Button DockPanel.Dock="Bottom" Content="+ Adicionar substituição" Click="AddSubstitution_Click"
+                            HorizontalAlignment="Left" Margin="0,10,0,0"
+                            AutomationProperties.Name="Adicionar substituição"/>
 
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="SubstitutionsList">
+                        <ItemsControl ItemsSource="{Binding Substitutions}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:CharacterSubstitution}">
-                                    <Border BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,8">
+                                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,8">
                                         <StackPanel>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -130,15 +237,18 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="De: " VerticalAlignment="Center"/>
                                                 <TextBox Grid.Column="1" Text="{Binding From, UpdateSourceTrigger=PropertyChanged}"
-                                                         FontFamily="Consolas" ToolTip="Caractere/símbolo original, como aparece no texto a digitar"/>
-                                                <Button Grid.Column="2" Content="Remover" Margin="6,0,0,0" Tag="{Binding}" Click="RemoveSubstitution_Click"/>
+                                                         FontFamily="{DynamicResource EditorFontFamily}" AutomationProperties.Name="Caractere original De"/>
+                                                <Button Grid.Column="2" Content="Remover" Margin="6,0,0,0" Tag="{Binding}" Click="RemoveSubstitution_Click"
+                                                        AutomationProperties.Name="Remover substituição"/>
                                             </Grid>
 
                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                 <RadioButton Content="Texto" Margin="0,0,16,0" VerticalAlignment="Center"
                                                              IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Texto}"/>
-                                                <RadioButton Content="Combinação de teclas" VerticalAlignment="Center"
+                                                <RadioButton Content="Combinação de teclas" Margin="0,0,16,0" VerticalAlignment="Center"
                                                              IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Combinacao}"/>
+                                                <RadioButton Content="Sequência física" VerticalAlignment="Center"
+                                                             IsChecked="{Binding Mode, Converter={x:Static helpers:EnumEqualsConverter.Instance}, ConverterParameter=Sequencia}"/>
                                             </StackPanel>
 
                                             <Grid Margin="0,6,0,0"
@@ -149,7 +259,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Para: " VerticalAlignment="Center"/>
                                                 <TextBox Grid.Column="1" Text="{Binding To, UpdateSourceTrigger=PropertyChanged}"
-                                                         FontFamily="Consolas" ToolTip="Substituto que será digitado pelo caminho normal (layout/dead keys/Unicode)"/>
+                                                         FontFamily="{DynamicResource EditorFontFamily}" AutomationProperties.Name="Texto substituto Para"/>
                                             </Grid>
 
                                             <Grid Margin="0,6,0,0"
@@ -159,8 +269,21 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBox Grid.Column="0" Text="{Binding ComboLabel, Mode=OneWay}" IsReadOnly="True"
-                                                         Background="#EEEEEE" FontFamily="Consolas"/>
-                                                <Button Grid.Column="1" Content="Capturar" Margin="6,0,0,0" Tag="{Binding}" Click="CaptureSubstitutionCombo_Click"/>
+                                                         Background="{DynamicResource SurfaceElevatedBrush}" FontFamily="{DynamicResource EditorFontFamily}"/>
+                                                <Button Grid.Column="1" Content="Capturar" Margin="6,0,0,0" Tag="{Binding}" Click="CaptureSubstitutionCombo_Click"
+                                                        AutomationProperties.Name="Capturar combinação de teclas"/>
+                                            </Grid>
+
+                                            <Grid Margin="0,6,0,0"
+                                                  Visibility="{Binding Mode, Converter={x:Static helpers:EnumToVisibilityConverter.Instance}, ConverterParameter=Sequencia}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Text="{Binding SequenceSummary, Mode=OneWay}" IsReadOnly="True"
+                                                         Background="{DynamicResource SurfaceElevatedBrush}" FontFamily="{DynamicResource EditorFontFamily}"/>
+                                                <Button Grid.Column="1" Content="Calibrar na VM..." Margin="6,0,0,0" Tag="{Binding}" Click="OpenCalibrationForSubstitution_Click"
+                                                        AutomationProperties.Name="Calibrar sequência no painel de diagnóstico"/>
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -171,23 +294,154 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- Comportamento -->
-            <TabItem Header="Comportamento">
+            <!-- 4. Atalhos -->
+            <TabItem Header="Atalhos" Tag="Atalhos">
                 <StackPanel Margin="10">
-                    <CheckBox x:Name="MinimizeToTrayCheck" Content="Minimizar para a bandeja do sistema" Margin="0,0,0,10"/>
-                    <CheckBox x:Name="StartMinimizedCheck" Content="Iniciar minimizado" Margin="0,0,0,10"/>
-                    <CheckBox x:Name="AlwaysOnTopCheck" Content="Sempre no topo" Margin="0,0,0,10"/>
-                    <CheckBox x:Name="ClearAfterCompletionCheck" Content="Limpar conteúdo do bloco após conclusão" Margin="0,0,0,10"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                        Quando ativado, ao concluir um bloco com sucesso o texto dele é apagado — mas o bloco continua existindo na fila (posição e histórico preservados), apenas vazio.
+                    <TextBlock Text="Iniciar digitação" FontWeight="Bold"/>
+                    <DockPanel Margin="0,4,0,14">
+                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CaptureStartHotkey_Click"
+                                AutomationProperties.Name="Capturar atalho de início"/>
+                        <TextBox x:Name="StartHotkeyBox" Text="{Binding StartHotkeyLabel, Mode=OneWay}" IsReadOnly="True"/>
+                    </DockPanel>
+
+                    <TextBlock Text="Pausar / Continuar" FontWeight="Bold"/>
+                    <DockPanel Margin="0,4,0,14">
+                        <Button DockPanel.Dock="Right" Content="Capturar" Click="CapturePauseHotkey_Click"
+                                AutomationProperties.Name="Capturar atalho de pausa"/>
+                        <TextBox x:Name="PauseHotkeyBox" Text="{Binding PauseResumeHotkeyLabel, Mode=OneWay}" IsReadOnly="True"/>
+                    </DockPanel>
+
+                    <TextBlock Text="Cancelar (emergência)" FontWeight="Bold"/>
+                    <TextBox Text="ESC (fixo, ativo somente durante a digitação)" IsReadOnly="True" Margin="0,4,0,16" Background="{DynamicResource SurfaceElevatedBrush}"/>
+
+                    <TextBlock Text="Comportamento da janela" FontWeight="Bold" Margin="0,4,0,6"/>
+                    <CheckBox Content="Minimizar para a bandeja do sistema" IsChecked="{Binding MinimizeToTray, Mode=TwoWay}" Margin="0,0,0,6"/>
+                    <CheckBox Content="Iniciar minimizado" IsChecked="{Binding StartMinimized, Mode=TwoWay}" Margin="0,0,0,6"/>
+                    <CheckBox Content="Sempre no topo" IsChecked="{Binding AlwaysOnTop, Mode=TwoWay}" Margin="0,0,0,6"/>
+
+                    <TextBlock Text="Tema da interface (Dark Mode / Light Mode)" FontWeight="Bold" Margin="0,8,0,4"/>
+                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding Theme, Mode=TwoWay}" Margin="0,0,0,6"
+                              AutomationProperties.Name="Tema visual">
+                        <ComboBoxItem Content="Automático (Segue o Windows)" Tag="{x:Static models:AppTheme.Auto}"/>
+                        <ComboBoxItem Content="Escuro (Dark Theme)" Tag="{x:Static models:AppTheme.Dark}"/>
+                        <ComboBoxItem Content="Claro (Light Theme)" Tag="{x:Static models:AppTheme.Light}"/>
+                    </ComboBox>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 5. Persistência -->
+            <TabItem Header="Persistência" Tag="Persistencia">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Política de persistência do texto da fila (queue.json)" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding QueueTextPersistenceTag, Mode=TwoWay}"
+                              AutomationProperties.Name="Política de persistência da fila">
+                        <ComboBoxItem Content="Completo (Full — padrão)" Tag="Full"/>
+                        <ComboBoxItem Content="Criptografado para o usuário atual do Windows (DPAPI)" Tag="Encrypted"/>
+                        <ComboBoxItem Content="Nunca salvar o texto dos blocos (None)" Tag="None"/>
+                    </ComboBox>
+                    <TextBlock Margin="0,4,0,14" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        No modo "Nunca (None)", ao reabrir o aplicativo os blocos aparecerão vazios com a nota "texto não persistido".
                     </TextBlock>
+
+                    <CheckBox Content="Limpar conteúdo do bloco após conclusão" IsChecked="{Binding ClearTextAfterCompletion, Mode=TwoWay}" Margin="0,0,0,14"/>
+
+                    <TextBlock Text="Local dos arquivos de configuração, fila e histórico" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Abrir pasta" Click="OpenPersistenceFolder_Click"
+                                AutomationProperties.Name="Abrir pasta de persistência"/>
+                        <TextBox Text="{Binding PersistenceFolderPath, Mode=OneWay}" IsReadOnly="True" Background="{DynamicResource SurfaceElevatedBrush}" FontFamily="{DynamicResource EditorFontFamily}"/>
+                    </DockPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 6. Diagnóstico -->
+            <TabItem Header="Diagnóstico" Tag="Diagnostico">
+                <StackPanel Margin="10">
+                    <CheckBox Content="Registrar telemetria de sessão em JSONL (sem caracteres em claro por padrão)"
+                              IsChecked="{Binding EnableDiagnosticsJsonl, Mode=TwoWay}" Margin="0,0,0,10"
+                              AutomationProperties.Name="Registrar telemetria JSONL"/>
+
+                    <CheckBox Content="DetailedTrace: incluir caracteres literais no diagnóstico desta sessão (desliga ao fechar)"
+                              IsChecked="{Binding DetailedTrace, Mode=TwoWay}" Margin="0,0,0,4"
+                              AutomationProperties.Name="Habilitar DetailedTrace"/>
+                    <TextBlock Margin="0,0,0,14" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" FontSize="12">
+                        Aviso de conteúdo sensível: quando ativado, caracteres literais de diagnóstico são gravados em %LocalAppData%\VmTyper\diagnostics\ apenas até fechar o aplicativo.
+                    </TextBlock>
+
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Retenção máxima de sessões JSONL (1–200):" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Text="{Binding DiagnosticsRetentionText, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                 AutomationProperties.Name="Retenção de sessões de diagnóstico"/>
+                    </Grid>
+
+                    <Button Content="Excluir diagnósticos" Click="PurgeDiagnostics_Click" HorizontalAlignment="Left" Padding="10,4"
+                            AutomationProperties.Name="Excluir todos os arquivos de diagnóstico"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 7. Navegador integrado -->
+            <TabItem Header="Navegador integrado" Tag="NavegadorIntegrado">
+                <StackPanel Margin="10">
+                    <CheckBox Content="Habilitar navegador integrado com WebView2 (experimental)"
+                              IsChecked="{Binding EmbeddedBrowser, Mode=TwoWay}" Margin="0,0,0,10"
+                              AutomationProperties.Name="Habilitar navegador integrado"/>
+                    <TextBlock Margin="0,0,0,14" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        O navegador externo permanece como o modo principal e padrão. Quando habilitado, exibe o seletor de ambiente na barra superior.
+                    </TextBlock>
+
+                    <TextBlock Text="Pasta do perfil isolado do WebView2" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding EmbeddedBrowserProfilePath, Mode=OneWay}" IsReadOnly="True" Background="{DynamicResource SurfaceElevatedBrush}" FontFamily="{DynamicResource EditorFontFamily}" Margin="0,0,0,10"/>
+
+                    <Button Content="Limpar dados do perfil" Click="ClearEmbeddedProfile_Click" HorizontalAlignment="Left" Padding="10,4"
+                            AutomationProperties.Name="Limpar dados do perfil do navegador integrado"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 8. Experimental -->
+            <TabItem Header="Experimental" Tag="Experimental">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Feature Flags Experimentais (§2.2)" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                    <CheckBox Content="AdaptiveTiming — Motor de temporização adaptativa com perfis (Rápido, Compatibilidade, Natural, Personalizado)"
+                              IsChecked="{Binding AdaptiveTiming, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Flag AdaptiveTiming"/>
+
+                    <CheckBox Content="TargetGuardStrict — Pausa também quando o título da janela ativa muda (troca de aba)"
+                              IsChecked="{Binding TargetGuardStrict, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Flag TargetGuardStrict"/>
+
+                    <CheckBox Content="EmbeddedBrowser — Exibe o modo de navegador integrado com WebView2 (experimental)"
+                              IsChecked="{Binding EmbeddedBrowser, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Flag EmbeddedBrowser"/>
+
+                    <CheckBox Content="CdpInput — Permite selecionar injeção via Chrome DevTools Protocol (Input.dispatchKeyEvent, experimental)"
+                              IsChecked="{Binding CdpInput, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Flag CdpInput"/>
+
+                    <CheckBox Content="DetailedTrace — Grava o caractere literal nos logs de diagnóstico apenas durante a sessão atual"
+                              IsChecked="{Binding DetailedTrace, Mode=TwoWay}" Margin="0,0,0,8"
+                              AutomationProperties.Name="Flag DetailedTrace"/>
                 </StackPanel>
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Content="Salvar" Click="Save_Click" MinWidth="90"/>
-            <Button Content="Cancelar" Click="CancelButton_Click" MinWidth="90"/>
-        </StackPanel>
+        <DockPanel Grid.Row="1" Margin="0,10,0,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button Content="Restaurar aba atual" Click="RestoreCurrentTabDefaults_Click" MinWidth="135"
+                        AutomationProperties.Name="Restaurar padrões da aba atual"/>
+                <Button Content="Restaurar todos os padrões" Click="RestoreDefaults_Click" MinWidth="165"
+                        AutomationProperties.Name="Restaurar todos os padrões"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Salvar" Click="Save_Click" MinWidth="90" Style="{StaticResource PrimaryButtonStyle}"
+                        AutomationProperties.Name="Salvar configurações"/>
+                <Button Content="Cancelar" Click="CancelButton_Click" MinWidth="90"
+                        AutomationProperties.Name="Cancelar configurações"/>
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Window>

@@ -18,16 +18,21 @@ public partial class App : System.Windows.Application
     private IKeyboardInputService? _typingService;
     private ActiveWindowService? _activeWindowService;
     private GlobalHotkeyService? _hotkeyService;
+    private TypingSessionCoordinator? _coordinator;
     private TrayIconService? _trayIconService;
     private MainViewModel? _mainViewModel;
 
-    public static MainViewModel MainViewModelInstance => ((App)Current)._mainViewModel!;
-    public static LogService LogServiceInstance => ((App)Current)._logService!;
-    public static SettingsService SettingsServiceInstance => ((App)Current)._settingsService!;
-    public static ActiveWindowService ActiveWindowServiceInstance => ((App)Current)._activeWindowService!;
-    public static GlobalHotkeyService HotkeyServiceInstance => ((App)Current)._hotkeyService!;
-    public static IKeyboardInputService TypingServiceInstance => ((App)Current)._typingService!;
-    public static TrayIconService TrayIconServiceInstance => ((App)Current)._trayIconService!;
+    public static MainViewModel MainViewModelInstance => ((Current as App)?._mainViewModel)!;
+    public static LogService LogServiceInstance => ((Current as App)?._logService)!;
+    public static SettingsService SettingsServiceInstance => ((Current as App)?._settingsService)!;
+    public static ActiveWindowService ActiveWindowServiceInstance => ((Current as App)?._activeWindowService)!;
+    public static GlobalHotkeyService HotkeyServiceInstance => ((Current as App)?._hotkeyService)!;
+    public static TypingSessionCoordinator CoordinatorInstance => ((Current as App)?._coordinator)!;
+    public static IKeyboardInputService TypingServiceInstance => ((Current as App)?._typingService)!;
+    public static TrayIconService TrayIconServiceInstance => ((Current as App)?._trayIconService)!;
+    public static string? QueueLoadCorruptPath => (Current as App)?._queuePersistenceService?.LastLoadResult is { Status: Services.Persistence.LoadStatus.Corrupt } r
+        ? r.PreservedCorruptPath
+        : null;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,11 +42,23 @@ public partial class App : System.Windows.Application
 
         _logService = new LogService(Dispatcher.CurrentDispatcher);
         _settingsService = new SettingsService();
+        var initialSettings = _settingsService.Load();
+
+        // Aplica o tema configurado (Auto, Light, Dark)
+        ThemeManager.Instance.ApplyTheme(initialSettings.Theme, force: true);
+
+        _logService.DetailedTrace = false;
         _historyService = new HistoryService();
-        _queuePersistenceService = new QueuePersistenceService();
-        _queueService = new TypingQueueService(_logService, Dispatcher.CurrentDispatcher, _queuePersistenceService);
-        _mappingService = new KeyboardMappingService();
-        _typingService = new KeyboardInputService(_mappingService, _logService);
+        _queuePersistenceService = new QueuePersistenceService(() =>
+            (_mainViewModel?.Settings ?? initialSettings).QueueTextPersistence);
+        _queueService = new TypingQueueService(
+            _logService,
+            _queuePersistenceService,
+            new DispatcherAutoSaveScheduler(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(1.5)));
+        _mappingService = new KeyboardMappingService(Native.Win32KeyboardLayoutProvider.Instance);
+        _typingService = new KeyboardInputService(
+            _mappingService, _logService,
+            Native.Win32InputInjector.Instance, Native.Win32KeyboardLayoutProvider.Instance);
         _activeWindowService = new ActiveWindowService();
         _hotkeyService = new GlobalHotkeyService();
         _trayIconService = new TrayIconService();
@@ -53,9 +70,10 @@ public partial class App : System.Windows.Application
         mainWindow.SourceInitialized += (_, _) =>
         {
             _hotkeyService.Initialize();
+            _coordinator = new TypingSessionCoordinator(_hotkeyService, _logService);
             _mainViewModel = new MainViewModel(
                 _typingService, _activeWindowService, _settingsService,
-                _historyService, _hotkeyService, _queueService, _logService);
+                _historyService, _hotkeyService, _queueService, _logService, _coordinator);
             mainWindow.AttachViewModel(_mainViewModel);
         };
 
@@ -78,15 +96,19 @@ public partial class App : System.Windows.Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        _logService?.Error("Exceção não tratada: " + e.Exception.Message);
-        // Garante que nenhum modificador fique preso mesmo em caso de erro
-        // totalmente inesperado na UI thread.
-        Native.Win32.ReleaseAllModifiers();
+        _logService?.Error($"Exceção não tratada na UI: {e.Exception.GetType().Name} - {e.Exception.Message}\n{e.Exception.StackTrace}");
+        System.Diagnostics.Debug.WriteLine($"[DispatcherUnhandledException] {e.Exception}");
+        // §2.2 item 6: último recurso baseado no InjectedKeyTracker (nunca solta modificadores por VK às cegas).
+        if (_typingService is KeyboardInputService kis)
+        {
+            kis.EmergencyReleaseTrackedKeys();
+        }
         e.Handled = true;
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_logService is not null) _logService.DetailedTrace = false;
         _mainViewModel?.Shutdown();
         _hotkeyService?.Dispose();
         _trayIconService?.Dispose();

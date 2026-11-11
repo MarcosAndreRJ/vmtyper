@@ -1,0 +1,63 @@
+<UserControl x:Class="VmTyper.Editor.CodeEditorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Editor de código AvalonEdit (cores vêm dos pincéis Editor* do tema ativo) -->
+        <avalonEdit:TextEditor Grid.Row="0" x:Name="TextEditor"
+                               ShowLineNumbers="True"
+                               FontFamily="{DynamicResource EditorFontFamily}"
+                               FontSize="13"
+                               WordWrap="False"
+                               Padding="4,2,0,2"
+                               Background="{DynamicResource EditorBackgroundBrush}"
+                               Foreground="{DynamicResource EditorForegroundBrush}"
+                               LineNumbersForeground="{DynamicResource EditorLineNumberBrush}"
+                               HorizontalScrollBarVisibility="Auto"
+                               VerticalScrollBarVisibility="Auto"/>
+
+        <!-- Barra de status do editor: posição, seleção e zoom da fonte -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource SurfaceElevatedBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="10,2">
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="PositionText" Text="Lin 1, Col 1" FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="·" Margin="8,0" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"/>
+                    <TextBlock x:Name="SelectionInfoText" Text="Nada selecionado" FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Fonte" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,4,0"/>
+                    <Button Content="&#xE738;" Click="ZoomOut_Click"
+                            Style="{StaticResource IconButtonStyle}"
+                            FontFamily="{DynamicResource IconFontFamily}" FontSize="11"
+                            MinWidth="26" MinHeight="22" Padding="4,2" Margin="0"
+                            ToolTip="Diminuir fonte do editor" AutomationProperties.Name="Diminuir fonte"/>
+                    <TextBlock x:Name="FontSizeText" Text="13" FontSize="12" FontWeight="SemiBold"
+                               MinWidth="22" TextAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <Button Content="&#xE710;" Click="ZoomIn_Click"
+                            Style="{StaticResource IconButtonStyle}"
+                            FontFamily="{DynamicResource IconFontFamily}" FontSize="11"
+                            MinWidth="26" MinHeight="22" Padding="4,2" Margin="0"
+                            ToolTip="Aumentar fonte do editor" AutomationProperties.Name="Aumentar fonte"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

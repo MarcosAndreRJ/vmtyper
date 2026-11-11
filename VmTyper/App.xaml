@@ -4,29 +4,13 @@
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- A ordem importa: [0] tema (substituído em tempo de execução pelo ThemeManager), depois tokens, design system e controles. -->
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/VmTyper;component/Themes/LightTheme.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/VmTyper;component/Themes/Tokens.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/VmTyper;component/Themes/DesignSystem.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/VmTyper;component/Themes/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-
-            <SolidColorBrush x:Key="AccentBrush" Color="#2D7DD2"/>
-            <SolidColorBrush x:Key="DangerBrush" Color="#D23838"/>
-            <SolidColorBrush x:Key="WarnBrush" Color="#D2A038"/>
-            <SolidColorBrush x:Key="OkBrush" Color="#2FA84F"/>
-
-            <Style TargetType="Button">
-                <Setter Property="Padding" Value="12,6"/>
-                <Setter Property="Margin" Value="4"/>
-                <Setter Property="MinWidth" Value="90"/>
-                <Setter Property="Cursor" Value="Hand"/>
-            </Style>
-
-            <Style TargetType="TextBlock">
-                <Setter Property="FontFamily" Value="Segoe UI"/>
-            </Style>
-
-            <Style TargetType="GroupBox">
-                <Setter Property="Margin" Value="0,4"/>
-                <Setter Property="Padding" Value="6"/>
-            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

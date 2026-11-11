@@ -1,0 +1,98 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="89ee19d4-c166-4eae-9049-addbff221a9e" name="Alcatraz@DESKTOP-09241UG 2026-11-09 21:11:39" runUser="DESKTOP-09241UG\Alcatraz" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-09T21:11:39.9101645-03:00" queuing="2026-11-09T21:11:39.9101647-03:00" start="2026-11-09T21:11:39.1661335-03:00" finish="2026-11-09T21:11:39.9151822-03:00" />
+  <TestSettings name="default" id="5e14feef-e949-4e4c-bd9d-ca81dfb63296">
+    <Deployment runDeploymentRoot="Alcatraz_DESKTOP-09241UG_2026-11-09_21_11_39" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="607ebddb-f4b5-476e-b389-285f3959b354" testId="d6fbd422-92fb-ac4a-8263-700c24f83656" testName="VmTyper.IntegrationTests.BaselineFidelityTests.BasicCorpus_V1Engine_ReachesReceiver" computerName="DESKTOP-09241UG" duration="00:00:00.0010000" startTime="2026-11-09T21:11:39.7963391-03:00" endTime="2026-11-09T21:11:39.7963582-03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="607ebddb-f4b5-476e-b389-285f3959b354">
+      <Output>
+        <ErrorInfo>
+          <Message>Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="249dd1fc-4c75-49c3-8fa9-d77026bf720f" testId="b560eeff-91b9-b7de-3ee5-c97d441376ed" testName="VmTyper.IntegrationTests.BaselineFidelityTests.SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars" computerName="DESKTOP-09241UG" duration="00:00:00.0010000" startTime="2026-11-09T21:11:39.7969756-03:00" endTime="2026-11-09T21:11:39.7969850-03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="249dd1fc-4c75-49c3-8fa9-d77026bf720f">
+      <Output>
+        <ErrorInfo>
+          <Message>Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="647a8f47-9347-43c0-b8e6-112d553e4f39" testId="3a4c742d-92be-46c7-c148-ced8141ad1fa" testName="VmTyper.IntegrationTests.BaselineFidelityTests.Corpus_ReachesReceiverIdentically_InBothModes" computerName="DESKTOP-09241UG" duration="00:00:00.0010000" startTime="2026-11-09T21:11:39.7779366-03:00" endTime="2026-11-09T21:11:39.7871161-03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="647a8f47-9347-43c0-b8e6-112d553e4f39">
+      <Output>
+        <ErrorInfo>
+          <Message>Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9ce5e344-588d-41ea-b512-b5477dc1b4f1" testId="4066f4e3-c68c-a45f-2b74-d09300121412" testName="VmTyper.IntegrationTests.RhythmBaselineTests.MeasureIntervalAndHold_IdleAndUnderLoad" computerName="DESKTOP-09241UG" duration="00:00:00.0010000" startTime="2026-11-09T21:11:39.7800596-03:00" endTime="2026-11-09T21:11:39.7807704-03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9ce5e344-588d-41ea-b512-b5477dc1b4f1">
+      <Output>
+        <ErrorInfo>
+          <Message>Medição demorada; defina VMTYPER_MEASURE=1.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="VmTyper.IntegrationTests.BaselineFidelityTests.SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars" storage="k:\trabalho\projetos\aspnet\tobrowser\vmtyper\tests\vmtyper.integrationtests\bin\debug\net10.0-windows\vmtyper.integrationtests.dll" id="b560eeff-91b9-b7de-3ee5-c97d441376ed">
+      <Execution id="249dd1fc-4c75-49c3-8fa9-d77026bf720f" />
+      <TestMethod codeBase="K:\Trabalho\Projetos\ASPNet\toBrowser\VmTyper\tests\VmTyper.IntegrationTests\bin\Debug\net10.0-windows\VmTyper.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="VmTyper.IntegrationTests.BaselineFidelityTests" name="SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars" />
+    </UnitTest>
+    <UnitTest name="VmTyper.IntegrationTests.BaselineFidelityTests.BasicCorpus_V1Engine_ReachesReceiver" storage="k:\trabalho\projetos\aspnet\tobrowser\vmtyper\tests\vmtyper.integrationtests\bin\debug\net10.0-windows\vmtyper.integrationtests.dll" id="d6fbd422-92fb-ac4a-8263-700c24f83656">
+      <Execution id="607ebddb-f4b5-476e-b389-285f3959b354" />
+      <TestMethod codeBase="K:\Trabalho\Projetos\ASPNet\toBrowser\VmTyper\tests\VmTyper.IntegrationTests\bin\Debug\net10.0-windows\VmTyper.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="VmTyper.IntegrationTests.BaselineFidelityTests" name="BasicCorpus_V1Engine_ReachesReceiver" />
+    </UnitTest>
+    <UnitTest name="VmTyper.IntegrationTests.BaselineFidelityTests.Corpus_ReachesReceiverIdentically_InBothModes" storage="k:\trabalho\projetos\aspnet\tobrowser\vmtyper\tests\vmtyper.integrationtests\bin\debug\net10.0-windows\vmtyper.integrationtests.dll" id="3a4c742d-92be-46c7-c148-ced8141ad1fa">
+      <Execution id="647a8f47-9347-43c0-b8e6-112d553e4f39" />
+      <TestMethod codeBase="K:\Trabalho\Projetos\ASPNet\toBrowser\VmTyper\tests\VmTyper.IntegrationTests\bin\Debug\net10.0-windows\VmTyper.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="VmTyper.IntegrationTests.BaselineFidelityTests" name="Corpus_ReachesReceiverIdentically_InBothModes" />
+    </UnitTest>
+    <UnitTest name="VmTyper.IntegrationTests.RhythmBaselineTests.MeasureIntervalAndHold_IdleAndUnderLoad" storage="k:\trabalho\projetos\aspnet\tobrowser\vmtyper\tests\vmtyper.integrationtests\bin\debug\net10.0-windows\vmtyper.integrationtests.dll" id="4066f4e3-c68c-a45f-2b74-d09300121412">
+      <Execution id="9ce5e344-588d-41ea-b512-b5477dc1b4f1" />
+      <TestMethod codeBase="K:\Trabalho\Projetos\ASPNet\toBrowser\VmTyper\tests\VmTyper.IntegrationTests\bin\Debug\net10.0-windows\VmTyper.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="VmTyper.IntegrationTests.RhythmBaselineTests" name="MeasureIntervalAndHold_IdleAndUnderLoad" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="d6fbd422-92fb-ac4a-8263-700c24f83656" executionId="607ebddb-f4b5-476e-b389-285f3959b354" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b560eeff-91b9-b7de-3ee5-c97d441376ed" executionId="249dd1fc-4c75-49c3-8fa9-d77026bf720f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3a4c742d-92be-46c7-c148-ced8141ad1fa" executionId="647a8f47-9347-43c0-b8e6-112d553e4f39" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4066f4e3-c68c-a45f-2b74-d09300121412" executionId="9ce5e344-588d-41ea-b512-b5477dc1b4f1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Resultados que não estão em uma lista" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Todos os resultados carregados" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="4" executed="0" passed="0" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.08]   Discovering: VmTyper.IntegrationTests&#xD;
+[xUnit.net 00:00:00.13]   Discovered:  VmTyper.IntegrationTests&#xD;
+[xUnit.net 00:00:00.16]   Starting:    VmTyper.IntegrationTests&#xD;
+[xUnit.net 00:00:00.19]       Medição demorada; defina VMTYPER_MEASURE=1.&#xD;
+[xUnit.net 00:00:00.20]       Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.&#xD;
+[xUnit.net 00:00:00.21]       Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.&#xD;
+[xUnit.net 00:00:00.21]       Injeta teclado real na sessão interativa; defina VMTYPER_INTEGRATION=1 com o desktop desbloqueado e sem mexer no teclado/mouse.&#xD;
+[xUnit.net 00:00:00.21]   Finished:    VmTyper.IntegrationTests&#xD;
+O teste 'VmTyper.IntegrationTests.RhythmBaselineTests.MeasureIntervalAndHold_IdleAndUnderLoad' foi ignorado na execução de teste.&#xD;
+O teste 'VmTyper.IntegrationTests.BaselineFidelityTests.Corpus_ReachesReceiverIdentically_InBothModes' foi ignorado na execução de teste.&#xD;
+O teste 'VmTyper.IntegrationTests.BaselineFidelityTests.BasicCorpus_V1Engine_ReachesReceiver' foi ignorado na execução de teste.&#xD;
+O teste 'VmTyper.IntegrationTests.BaselineFidelityTests.SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars' foi ignorado na execução de teste.&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="DESKTOP-09241UG" outcome="Warning" timestamp="2026-11-09T21:11:39.7831198-03:00">
+        <Text>[xUnit.net 00:00:00.19]     VmTyper.IntegrationTests.RhythmBaselineTests.MeasureIntervalAndHold_IdleAndUnderLoad [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-09241UG" outcome="Warning" timestamp="2026-11-09T21:11:39.7876801-03:00">
+        <Text>[xUnit.net 00:00:00.20]     VmTyper.IntegrationTests.BaselineFidelityTests.Corpus_ReachesReceiverIdentically_InBothModes [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-09241UG" outcome="Warning" timestamp="2026-11-09T21:11:39.7967964-03:00">
+        <Text>[xUnit.net 00:00:00.21]     VmTyper.IntegrationTests.BaselineFidelityTests.BasicCorpus_V1Engine_ReachesReceiver [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-09241UG" outcome="Warning" timestamp="2026-11-09T21:11:39.7973442-03:00">
+        <Text>[xUnit.net 00:00:00.21]     VmTyper.IntegrationTests.BaselineFidelityTests.SecondWindowOpenedMidTyping_PausesSession_AndSecondWindowReceivesZeroChars [SKIP]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

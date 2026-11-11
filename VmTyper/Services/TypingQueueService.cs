@@ -1,56 +1,75 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Windows.Threading;
 using VmTyper.Models;
 
 namespace VmTyper.Services;
 
 /// <summary>
-/// Único ponto responsável pelas regras de navegação da fila de blocos de
-/// texto: qual é o próximo bloco, quando avançar, como reagir a
-/// cancelamento/pausa, reordenação, remoção e reinício. Nenhuma dessas
-/// regras deve viver espalhada em code-behind ou no ViewModel — tudo passa
-/// por aqui, o que torna as transições de estado previsíveis e evita saltos
-/// indevidos de bloco (ver seções 31-33 do pedido de evolução).
+/// Único ponto responsável pelas regras de navegação e transição da fila de
+/// blocos de texto (modelo v2).
 ///
-/// Regra central: a cada momento existe NO MÁXIMO um bloco com status
-/// <see cref="TextBlockStatus.Current"/> (o próximo elegível, pulando
-/// blocos vazios) e NO MÁXIMO um com <see cref="TextBlockStatus.Typing"/>
-/// (o que está em execução agora). <see cref="RecalculateStatuses"/> é a
-/// única função que decide qual bloco é "Current" — ela é determinística a
-/// partir da ordem e do status "Completed"/vazio de cada bloco, então nunca
-/// há necessidade de manipular um índice solto em vários lugares.
+/// Regra central v2 (ADR 0002):
+///  - "Próximo" não é mais um status: fica em <see cref="NextBlockId"/>,
+///    calculado a partir de <see cref="ManualNextId"/> (se apontar para um
+///    bloco existente em Ready/PartiallySent/Interrupted/Failed) ou do
+///    primeiro bloco em <see cref="TextBlockStatus.Ready"/> na ordem.
+///  - Todas as transições de estado passam pelo método único
+///    <see cref="Transition"/>.
 /// </summary>
 public sealed class TypingQueueService
 {
-    private readonly QueuePersistenceService _persistence;
+    private readonly IQueueStore _persistence;
     private readonly LogService _log;
-    private readonly DispatcherTimer _autoSaveTimer;
+    private readonly IAutoSaveScheduler _autoSaveTimer;
+
+    private bool _suppressPropertyCallback;
+    private bool _isRecalculating;
+    private readonly Dictionary<Guid, string> _lockedTextSnapshot = new();
 
     public ObservableCollection<TextBlockItem> Blocks { get; } = new();
+
+    private bool _isLocked;
+    /// <summary>Quando verdadeiro (sessão ativa no coordenador), bloqueia qualquer mutação da fila.</summary>
+    public bool IsLocked
+    {
+        get => _isLocked;
+        set
+        {
+            if (_isLocked == value) return;
+            _isLocked = value;
+            _lockedTextSnapshot.Clear();
+            if (value)
+            {
+                foreach (var b in Blocks) _lockedTextSnapshot[b.Id] = b.Text;
+            }
+        }
+    }
+
+    public Guid? ManualNextId { get; private set; }
+    public Guid? NextBlockId { get; private set; }
 
     /// <summary>Disparado após qualquer mutação relevante da fila (para a UI atualizar rótulos/resumos).</summary>
     public event Action? Changed;
 
-    public TypingQueueService(LogService log, Dispatcher dispatcher, QueuePersistenceService persistence)
+    /// <summary>Disparado quando um bloco já enviado (Sent) é editado e devolvido para Ready.</summary>
+    public event Action<TextBlockItem>? SentBlockEdited;
+
+    /// <summary>Disparado quando uma gravação em disco falha (§4.1).</summary>
+    public event Action<string>? PersistenceFailed
+    {
+        add => _persistence.PersistenceFailed += value;
+        remove => _persistence.PersistenceFailed -= value;
+    }
+
+    public Persistence.LoadResult<List<TextBlockItem>>? LastLoadResult => _persistence.LastLoadResult;
+
+    public TypingQueueService(LogService log, IQueueStore persistence, IAutoSaveScheduler autoSave)
     {
         _log = log;
         _persistence = persistence;
-
-        // Autosave "debounced": edições de texto reiniciam o timer, e só
-        // gravamos em disco 1.5s depois da última digitação — evita I/O a
-        // cada tecla pressionada, mas garante que o conteúdo preparado não
-        // se perca se o aplicativo for fechado inesperadamente.
-        _autoSaveTimer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
-        {
-            Interval = TimeSpan.FromSeconds(1.5)
-        };
-        _autoSaveTimer.Tick += (_, _) =>
-        {
-            _autoSaveTimer.Stop();
-            Save();
-        };
+        _autoSaveTimer = autoSave;
+        _autoSaveTimer.Elapsed += Save;
 
         Blocks.CollectionChanged += OnBlocksCollectionChanged;
         LoadInternal();
@@ -69,10 +88,26 @@ public sealed class TypingQueueService
 
     private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (_suppressPropertyCallback || _isRecalculating || sender is not TextBlockItem block) return;
+
         if (e.PropertyName == nameof(TextBlockItem.Text))
         {
-            _autoSaveTimer.Stop();
-            _autoSaveTimer.Start();
+            if (IsLocked || block.Status is TextBlockStatus.Typing or TextBlockStatus.Paused)
+            {
+                // Edição bloqueada durante Typing/Paused ou fila travada: reverte ao texto salvo.
+                if (_lockedTextSnapshot.TryGetValue(block.Id, out var original) && block.Text != original)
+                {
+                    _log.Warn($"Edição bloqueada no Bloco {block.Order} (fila travada / estado {block.Status}).");
+                    _suppressPropertyCallback = true;
+                    try { block.Text = original; }
+                    finally { _suppressPropertyCallback = false; }
+                }
+                return;
+            }
+
+            _lockedTextSnapshot[block.Id] = block.Text;
+            Transition(block.Id, BlockTransitionEvent.TextEdited);
+            _autoSaveTimer.Restart();
         }
     }
 
@@ -80,150 +115,400 @@ public sealed class TypingQueueService
     // Consultas
     // ------------------------------------------------------------------
 
-    public TextBlockItem? Current => Blocks.FirstOrDefault(b => b.Status == TextBlockStatus.Current);
+    /// <summary>Bloco apontado por <see cref="NextBlockId"/>, ou null se não houver nenhum elegível.</summary>
+    public TextBlockItem? Current => NextBlockId.HasValue ? Find(NextBlockId.Value) : null;
 
     public int TotalBlocks => Blocks.Count;
-    public int CompletedCount => Blocks.Count(b => b.Status == TextBlockStatus.Completed);
+    public int CompletedCount => Blocks.Count(b => b.Status == TextBlockStatus.Sent);
     public int PendingCount => TotalBlocks - CompletedCount;
 
     /// <summary>Retorna o bloco a digitar no próximo acionamento, ou null se não houver nenhum elegível.</summary>
     public TextBlockItem? PeekNext() => Current;
 
     // ------------------------------------------------------------------
-    // Transições de execução (chamadas pelo MainViewModel)
+    // Máquina de estados (tabela 1.2)
     // ------------------------------------------------------------------
-
-    public void BeginTyping(Guid id)
-    {
-        var block = Find(id);
-        if (block is null) return;
-        block.Status = TextBlockStatus.Typing;
-        Changed?.Invoke();
-    }
-
-    public void CompleteBlock(Guid id, bool clearTextAfterCompletion)
-    {
-        var block = Find(id);
-        if (block is null) return;
-
-        block.Status = TextBlockStatus.Completed;
-        if (clearTextAfterCompletion)
-        {
-            // Mantém o bloco (identidade/posição/histórico), apenas esvazia
-            // o conteúdo já digitado.
-            block.Text = string.Empty;
-        }
-
-        RecalculateStatuses();
-        Save();
-    }
 
     /// <summary>
-    /// Usado tanto para ESC/cancelamento quanto para erro inesperado: o
-    /// bloco volta a ser o próximo a digitar (nunca avança nem é perdido).
+    /// Método único de transição da máquina de estados dos blocos (§1.2).
+    /// Retorna <c>true</c> se a transição foi válida e aplicada, ou <c>false</c> se proibida (✗).
     /// </summary>
-    public void CancelBlock(Guid id)
+    public bool Transition(
+        Guid id,
+        BlockTransitionEvent evt,
+        int? sentUpToIndex = null,
+        string? error = null,
+        Guid? sessionId = null,
+        bool clearTextOnSent = false)
     {
-        var block = Find(id);
-        if (block is null) return;
+        if (_isRecalculating) return false;
+        _isRecalculating = true;
+        try
+        {
+            var block = Find(id);
+            if (block is null) return false;
 
-        block.Status = TextBlockStatus.Pending;
-        RecalculateStatuses();
-        Save();
+            if (sentUpToIndex.HasValue) block.SentUpToIndex = sentUpToIndex.Value;
+            if (sessionId.HasValue) block.LastSessionId = sessionId.Value;
+
+            var from = block.Status;
+            bool wasSentEdited = false;
+
+            switch (from)
+            {
+                case TextBlockStatus.Empty:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            if (!block.IsEmpty) block.Status = TextBlockStatus.Ready;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.Status = TextBlockStatus.Empty;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Ready:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            if (block.IsEmpty) block.Status = TextBlockStatus.Empty;
+                            break;
+                        case BlockTransitionEvent.BeginTyping:
+                            if (block.IsEmpty) return false;
+                            _lockedTextSnapshot[block.Id] = block.Text;
+                            block.Status = TextBlockStatus.Typing;
+                            block.LastError = null;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
+                            ManualNextId = block.Id;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Typing:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.PauseOrResume:
+                            block.Status = TextBlockStatus.Paused;
+                            break;
+                        case BlockTransitionEvent.AllSent:
+                            block.Status = TextBlockStatus.Sent;
+                            block.SentUpToIndex = block.Text.Length;
+                            block.LastError = null;
+                            if (ManualNextId == block.Id) ManualNextId = null;
+                            if (clearTextOnSent)
+                            {
+                                _suppressPropertyCallback = true;
+                                try { block.Text = string.Empty; }
+                                finally { _suppressPropertyCallback = false; }
+                            }
+                            break;
+                        case BlockTransitionEvent.Cancel:
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                                ManualNextId = block.Id;
+                            }
+                            else
+                            {
+                                block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                                ManualNextId = block.Id;
+                            }
+                            break;
+                        case BlockTransitionEvent.Fail:
+                            block.LastError = error;
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                            }
+                            else
+                            {
+                                block.Status = TextBlockStatus.Failed;
+                            }
+                            ManualNextId = block.Id;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Paused:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.PauseOrResume:
+                            block.Status = TextBlockStatus.Typing;
+                            break;
+                        case BlockTransitionEvent.Cancel:
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                                ManualNextId = block.Id;
+                            }
+                            else
+                            {
+                                block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                                ManualNextId = block.Id;
+                            }
+                            break;
+                        case BlockTransitionEvent.Fail:
+                            block.LastError = error;
+                            if (block.SentUpToIndex > 0)
+                            {
+                                block.Status = TextBlockStatus.PartiallySent;
+                            }
+                            else
+                            {
+                                block.Status = TextBlockStatus.Failed;
+                            }
+                            ManualNextId = block.Id;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Sent:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            wasSentEdited = !block.IsEmpty;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = TextBlockStatus.Ready;
+                            ManualNextId = block.Id;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case TextBlockStatus.Cancelled:
+                case TextBlockStatus.PartiallySent:
+                case TextBlockStatus.Interrupted:
+                case TextBlockStatus.Failed:
+                    switch (evt)
+                    {
+                        case BlockTransitionEvent.TextEdited:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        case BlockTransitionEvent.BeginTyping:
+                            if (block.IsEmpty) return false;
+                            _lockedTextSnapshot[block.Id] = block.Text;
+                            block.Status = TextBlockStatus.Typing;
+                            block.LastError = null;
+                            break;
+                        case BlockTransitionEvent.SetAsNext:
+                            if (block.IsEmpty) return false;
+                            ManualNextId = block.Id;
+                            break;
+                        case BlockTransitionEvent.Restart:
+                            block.SentUpToIndex = 0;
+                            block.LastError = null;
+                            block.Status = block.IsEmpty ? TextBlockStatus.Empty : TextBlockStatus.Ready;
+                            break;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                default:
+                    return false;
+            }
+
+            RecalculateNext();
+            if (wasSentEdited)
+            {
+                SentBlockEdited?.Invoke(block);
+            }
+            return true;
+        }
+        finally
+        {
+            _isRecalculating = false;
+        }
     }
 
     // ------------------------------------------------------------------
-    // Edição da fila
+    // Atalhos de transição (chamados pelo MainViewModel e testes)
     // ------------------------------------------------------------------
 
-    public TextBlockItem AddBlock()
+    public bool BeginTyping(Guid id, Guid? sessionId = null)
+        => Transition(id, BlockTransitionEvent.BeginTyping, sessionId: sessionId);
+
+    public bool PauseOrResumeBlock(Guid id)
+        => Transition(id, BlockTransitionEvent.PauseOrResume);
+
+    public bool CompleteBlock(Guid id, bool clearTextAfterCompletion, int? sentUnits = null, Guid? sessionId = null)
     {
+        bool ok = Transition(id, BlockTransitionEvent.AllSent, sentUpToIndex: sentUnits, sessionId: sessionId, clearTextOnSent: clearTextAfterCompletion);
+        if (ok) Save();
+        return ok;
+    }
+
+    public bool CancelBlock(Guid id, int sentUpToIndex = 0, Guid? sessionId = null)
+    {
+        bool ok = Transition(id, BlockTransitionEvent.Cancel, sentUpToIndex: sentUpToIndex, sessionId: sessionId);
+        if (ok) Save();
+        return ok;
+    }
+
+    public bool FailBlock(Guid id, string error, int sentUpToIndex = 0, Guid? sessionId = null)
+    {
+        bool ok = Transition(id, BlockTransitionEvent.Fail, sentUpToIndex: sentUpToIndex, error: error, sessionId: sessionId);
+        if (ok) Save();
+        return ok;
+    }
+
+    // ------------------------------------------------------------------
+    // Edição da fila (todos os mutadores verificam IsLocked / bloco ativo)
+    // ------------------------------------------------------------------
+
+    private bool EnsureEditable(string operation)
+    {
+        if (IsLocked || Blocks.Any(b => b.Status is TextBlockStatus.Typing or TextBlockStatus.Paused))
+        {
+            _log.Warn($"Operação '{operation}' recusada: a fila está bloqueada durante uma sessão ativa.");
+            return false;
+        }
+        return true;
+    }
+
+    public bool AddBlock(out TextBlockItem? added)
+    {
+        if (!EnsureEditable(nameof(AddBlock)))
+        {
+            added = null;
+            return false;
+        }
+
         var block = new TextBlockItem
         {
             Order = Blocks.Count + 1,
             Text = string.Empty,
-            Status = TextBlockStatus.Pending
+            Status = TextBlockStatus.Empty
         };
         Blocks.Add(block);
         RenumberAndRecalculate();
         Save();
+        added = block;
+        return true;
+    }
+
+    public TextBlockItem? AddBlock()
+    {
+        AddBlock(out var block);
         return block;
     }
 
-    public void RemoveBlock(Guid id)
+    public bool RemoveBlock(Guid id)
     {
-        var block = Find(id);
-        if (block is null || block.Status == TextBlockStatus.Typing) return;
+        if (!EnsureEditable(nameof(RemoveBlock))) return false;
 
+        var block = Find(id);
+        if (block is null || block.Status is TextBlockStatus.Typing or TextBlockStatus.Paused) return false;
+
+        if (ManualNextId == id) ManualNextId = null;
         Blocks.Remove(block);
         if (Blocks.Count == 0)
         {
-            Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Pending });
+            Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Empty });
         }
 
         RenumberAndRecalculate();
         Save();
+        return true;
     }
 
-    public void MoveUp(Guid id)
+    public bool MoveUp(Guid id)
     {
+        if (!EnsureEditable(nameof(MoveUp))) return false;
+
         int index = IndexOf(id);
-        if (index <= 0 || Blocks[index].Status == TextBlockStatus.Typing) return;
+        if (index <= 0 || Blocks[index].Status is TextBlockStatus.Typing or TextBlockStatus.Paused) return false;
 
         Blocks.Move(index, index - 1);
         RenumberAndRecalculate();
         Save();
+        return true;
     }
 
-    public void MoveDown(Guid id)
+    public bool MoveDown(Guid id)
     {
+        if (!EnsureEditable(nameof(MoveDown))) return false;
+
         int index = IndexOf(id);
-        if (index < 0 || index >= Blocks.Count - 1 || Blocks[index].Status == TextBlockStatus.Typing) return;
+        if (index < 0 || index >= Blocks.Count - 1 || Blocks[index].Status is TextBlockStatus.Typing or TextBlockStatus.Paused) return false;
 
         Blocks.Move(index, index + 1);
         RenumberAndRecalculate();
         Save();
+        return true;
     }
 
     /// <summary>
-    /// Define manualmente um bloco como o próximo a digitar. Blocos a partir
-    /// da posição do alvo (inclusive) que estavam "Concluído" ou "Próximo"
-    /// voltam a "Pendente" antes de recalcular — blocos ANTES do alvo não
-    /// são tocados, preservando o que já foi de fato digitado.
+    /// Define manualmente um bloco como o próximo a digitar, gravando
+    /// <see cref="ManualNextId"/> sem alterar o status de outros blocos (§1.3 B).
     /// </summary>
-    public void SetAsNext(Guid id)
+    public bool SetAsNext(Guid id)
     {
-        var target = Find(id);
-        if (target is null || target.Status == TextBlockStatus.Typing) return;
+        if (!EnsureEditable(nameof(SetAsNext))) return false;
 
-        foreach (var block in Blocks.Where(b => b.Order >= target.Order))
-        {
-            if (block.Status is TextBlockStatus.Completed or TextBlockStatus.Current)
-                block.Status = TextBlockStatus.Pending;
-        }
-
-        RecalculateStatuses();
-        Save();
+        bool ok = Transition(id, BlockTransitionEvent.SetAsNext);
+        if (ok) Save();
+        return ok;
     }
 
-    public void RestartQueue()
+    public bool RestartQueue()
     {
+        if (!EnsureEditable(nameof(RestartQueue))) return false;
+
+        ManualNextId = null;
         foreach (var block in Blocks)
         {
-            if (block.Status != TextBlockStatus.Typing)
-                block.Status = TextBlockStatus.Pending;
+            Transition(block.Id, BlockTransitionEvent.Restart);
         }
 
-        RecalculateStatuses();
+        RecalculateNext();
         Save();
+        return true;
     }
 
-    public void NewQueue()
+    public bool NewQueue()
     {
+        if (!EnsureEditable(nameof(NewQueue))) return false;
+
+        ManualNextId = null;
         Blocks.Clear();
-        Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Pending });
-        RecalculateStatuses();
+        Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Empty });
+        RenumberAndRecalculate();
         Save();
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -239,25 +524,52 @@ public sealed class TypingQueueService
     {
         var loaded = _persistence.Load();
 
-        Blocks.Clear();
-        foreach (var block in loaded.OrderBy(b => b.Order))
+        _suppressPropertyCallback = true;
+        try
         {
-            // Uma execução que estava em andamento quando o app foi fechado
-            // (ou travou) não pode ser restaurada como "Digitando" — nunca
-            // terminou de fato, então volta a ser candidata normal.
-            if (block.Status == TextBlockStatus.Typing)
-                block.Status = TextBlockStatus.Pending;
+            Blocks.Clear();
+            foreach (var block in loaded.OrderBy(b => b.Order))
+            {
+                NormalizeLoadedBlock(block);
+                Blocks.Add(block);
+            }
 
-            Blocks.Add(block);
+            if (Blocks.Count == 0)
+            {
+                Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Empty });
+            }
         }
-
-        if (Blocks.Count == 0)
+        finally
         {
-            Blocks.Add(new TextBlockItem { Order = 1, Text = string.Empty, Status = TextBlockStatus.Pending });
+            _suppressPropertyCallback = false;
         }
 
         RenumberAndRecalculate();
-        _log.Info($"Fila carregada: {Blocks.Count} bloco(s), {CompletedCount} concluído(s).");
+        _log.Info($"Fila carregada: {Blocks.Count} bloco(s), {CompletedCount} enviado(s).");
+    }
+
+    /// <summary>
+    /// Aplica as regras de carregamento (§1.1):
+    /// Typing/Paused ao carregar viram Interrupted; Empty/Ready coerentes com o texto.
+    /// </summary>
+    public static void NormalizeLoadedBlock(TextBlockItem block)
+    {
+        if (block.Status is TextBlockStatus.Typing or TextBlockStatus.Paused)
+        {
+            block.Status = TextBlockStatus.Interrupted;
+        }
+        else if (block.Status == TextBlockStatus.Cancelled)
+        {
+            if (block.IsEmpty) block.Status = TextBlockStatus.Empty;
+        }
+        else if (block.Status == TextBlockStatus.Ready && block.IsEmpty)
+        {
+            block.Status = TextBlockStatus.Empty;
+        }
+        else if (block.Status == TextBlockStatus.Empty && !block.IsEmpty)
+        {
+            block.Status = TextBlockStatus.Ready;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -279,41 +591,58 @@ public sealed class TypingQueueService
     {
         int order = 1;
         foreach (var block in Blocks) block.Order = order++;
-        RecalculateStatuses();
+        RecalculateNext();
     }
 
-    /// <summary>
-    /// Única função que decide qual bloco é "Current". Percorre a fila em
-    /// ordem: blocos "Completed" ficam intocados; um bloco "Typing" (em
-    /// execução) também fica intocado e "consome" a vaga de bloco ativo;
-    /// o primeiro bloco não-concluído e não-vazio encontrado depois disso
-    /// vira "Current"; qualquer outro bloco que estivesse marcado "Current"
-    /// indevidamente volta a "Pending". Blocos vazios nunca recebem
-    /// "Current" — são pulados automaticamente (seção 12).
-    /// </summary>
-    private void RecalculateStatuses()
-    {
-        bool assigned = false;
+    public static bool IsBlockEligible(TextBlockItem block) =>
+        !block.IsEmpty && block.Status is
+            TextBlockStatus.Ready or
+            TextBlockStatus.Cancelled or
+            TextBlockStatus.PartiallySent or
+            TextBlockStatus.Interrupted or
+            TextBlockStatus.Failed;
 
+    /// <summary>
+    /// Calcula <see cref="NextBlockId"/> e atualiza <see cref="TextBlockItem.IsNext"/>:
+    /// 1. Se houver um bloco em Typing/Paused, ele permanece como o bloco ativo.
+    /// 2. Se <see cref="ManualNextId"/> aponta para um bloco elegível, respeita a seleção manual.
+    /// 3. Caso contrário, seleciona o primeiro bloco elegível na ordem da fila.
+    /// </summary>
+    private void RecalculateNext()
+    {
+        Guid? resolved = null;
+
+        var activeTyping = Blocks.FirstOrDefault(b => b.Status is TextBlockStatus.Typing or TextBlockStatus.Paused);
+        if (activeTyping is not null)
+        {
+            resolved = activeTyping.Id;
+        }
+        else
+        {
+            if (ManualNextId.HasValue)
+            {
+                var manual = Find(ManualNextId.Value);
+                if (manual is not null && IsBlockEligible(manual))
+                {
+                    resolved = manual.Id;
+                }
+                else
+                {
+                    ManualNextId = null;
+                }
+            }
+
+            if (resolved is null)
+            {
+                var firstEligible = Blocks.FirstOrDefault(b => IsBlockEligible(b));
+                resolved = firstEligible?.Id;
+            }
+        }
+
+        NextBlockId = resolved;
         foreach (var block in Blocks)
         {
-            if (block.Status == TextBlockStatus.Completed) continue;
-
-            if (block.Status == TextBlockStatus.Typing)
-            {
-                assigned = true;
-                continue;
-            }
-
-            if (!assigned && !block.IsEmpty)
-            {
-                block.Status = TextBlockStatus.Current;
-                assigned = true;
-            }
-            else if (block.Status == TextBlockStatus.Current)
-            {
-                block.Status = TextBlockStatus.Pending;
-            }
+            block.IsNext = resolved.HasValue && block.Id == resolved.Value;
         }
 
         Changed?.Invoke();

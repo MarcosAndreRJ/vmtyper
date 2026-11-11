@@ -1,118 +1,58 @@
-using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using VmTyper.Models;
 using VmTyper.Services;
-using InputMethod = VmTyper.Models.InputMethod;
-using MessageBox = System.Windows.MessageBox;
+using VmTyper.Services.Persistence;
+using VmTyper.ViewModels;
 using Button = System.Windows.Controls.Button;
+using MessageBox = System.Windows.MessageBox;
 
 namespace VmTyper.Views;
 
 public partial class SettingsWindow : Window
 {
     private readonly SettingsService _settingsService;
-    private AppSettings _working;
-
-    private HotkeyDefinition _startHotkey = new();
-    private HotkeyDefinition _pauseHotkey = new();
+    public SettingsViewModel ViewModel { get; }
 
     private bool _capturingStart;
     private bool _capturingPause;
     private CharacterSubstitution? _capturingSubstitution;
 
-    private readonly ObservableCollection<CharacterSubstitution> _substitutions = new();
-
     public SettingsWindow(SettingsService settingsService)
     {
         InitializeComponent();
         _settingsService = settingsService;
-        _working = _settingsService.Load();
-        SubstitutionsList.ItemsSource = _substitutions;
-        LoadIntoUi(_working);
+        var loaded = _settingsService.Load();
+
+        if (_settingsService.LastLoadResult is { Status: LoadStatus.Corrupt } corrupt)
+        {
+            MessageBox.Show(
+                this,
+                $"O arquivo de configurações não pôde ser lido e foi preservado em:\n{corrupt.PreservedCorruptPath}\n\nAs configurações padrão foram carregadas para edição.",
+                "Configurações corrompidas",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        ViewModel = new SettingsViewModel(loaded);
+        DataContext = ViewModel;
 
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
-    private void LoadIntoUi(AppSettings s)
-    {
-        CharDelayBox.Text = s.CharDelayMs.ToString();
-        EnterDelayBox.Text = s.EnterDelayMs.ToString();
-        CountdownBox.Text = s.CountdownSeconds.ToString();
+    private void PresetInstantaneo_Click(object sender, RoutedEventArgs e) => ViewModel.SetPresetDelays(0, 0);
+    private void PresetMuitoRapido_Click(object sender, RoutedEventArgs e) => ViewModel.SetPresetDelays(1, 10);
+    private void PresetRapido_Click(object sender, RoutedEventArgs e) => ViewModel.SetPresetDelays(3, 15);
+    private void PresetNormal_Click(object sender, RoutedEventArgs e) => ViewModel.SetPresetDelays(10, 30);
+    private void PresetCompatibilidade_Click(object sender, RoutedEventArgs e) => ViewModel.SetPresetDelays(30, 60);
 
-        MethodCombo.SelectedIndex = s.Method switch
-        {
-            InputMethod.Automatico => 0,
-            InputMethod.TecladoFisico => 1,
-            InputMethod.Unicode => 2,
-            _ => 0
-        };
-
-        PreserveIndentationCheck.IsChecked = s.PreserveOriginalIndentation;
-
-        _substitutions.Clear();
-        foreach (var sub in s.CharacterSubstitutions)
-        {
-            _substitutions.Add(new CharacterSubstitution
-            {
-                From = sub.From,
-                To = sub.To,
-                Mode = sub.Mode,
-                ComboShift = sub.ComboShift,
-                ComboCtrl = sub.ComboCtrl,
-                ComboAlt = sub.ComboAlt,
-                ComboVirtualKey = sub.ComboVirtualKey,
-                ComboLabel = sub.ComboLabel
-            });
-        }
-
-        _startHotkey = Clone(s.StartHotkey);
-        _pauseHotkey = Clone(s.PauseResumeHotkey);
-        StartHotkeyBox.Text = _startHotkey.ToString();
-        PauseHotkeyBox.Text = _pauseHotkey.ToString();
-
-        ValidateWindowCheck.IsChecked = s.ValidateTargetWindow;
-        ExpectedBrowserCombo.SelectedIndex = s.ExpectedBrowser switch
-        {
-            ExpectedBrowser.Nenhum => 0,
-            ExpectedBrowser.Chrome => 1,
-            ExpectedBrowser.Edge => 2,
-            ExpectedBrowser.Firefox => 3,
-            _ => 0
-        };
-
-        MinimizeToTrayCheck.IsChecked = s.MinimizeToTray;
-        StartMinimizedCheck.IsChecked = s.StartMinimized;
-        AlwaysOnTopCheck.IsChecked = s.AlwaysOnTop;
-        ClearAfterCompletionCheck.IsChecked = s.ClearTextAfterCompletion;
-    }
-
-    private static HotkeyDefinition Clone(HotkeyDefinition h) => new()
-    {
-        Ctrl = h.Ctrl,
-        Shift = h.Shift,
-        Alt = h.Alt,
-        VirtualKey = h.VirtualKey
-    };
-
-    // --- Presets de velocidade (item 7 do escopo) ---
-    private void PresetInstantaneo_Click(object sender, RoutedEventArgs e) => SetDelays(0, 0);
-    private void PresetMuitoRapido_Click(object sender, RoutedEventArgs e) => SetDelays(1, 10);
-    private void PresetRapido_Click(object sender, RoutedEventArgs e) => SetDelays(3, 15);
-    private void PresetNormal_Click(object sender, RoutedEventArgs e) => SetDelays(10, 30);
-    private void PresetCompatibilidade_Click(object sender, RoutedEventArgs e) => SetDelays(30, 60);
-
-    private void SetDelays(int charDelay, int enterDelay)
-    {
-        CharDelayBox.Text = charDelay.ToString();
-        EnterDelayBox.Text = enterDelay.ToString();
-    }
-
-    // --- Captura de atalhos ---
     private void CaptureStartHotkey_Click(object sender, RoutedEventArgs e)
     {
         _capturingPause = false;
+        _capturingSubstitution = null;
         _capturingStart = true;
         StartHotkeyBox.Text = "Pressione a combinação desejada...";
     }
@@ -120,6 +60,7 @@ public partial class SettingsWindow : Window
     private void CapturePauseHotkey_Click(object sender, RoutedEventArgs e)
     {
         _capturingStart = false;
+        _capturingSubstitution = null;
         _capturingPause = true;
         PauseHotkeyBox.Text = "Pressione a combinação desejada...";
     }
@@ -133,15 +74,11 @@ public partial class SettingsWindow : Window
         if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift
                  or Key.LeftAlt or Key.RightAlt or Key.System)
         {
-            return; // aguarda a tecla "principal"
+            return;
         }
 
         var modifiers = Keyboard.Modifiers;
 
-        // Captura de combinação para substituição: ao contrário dos
-        // atalhos globais, NÃO exige modificador — a VM pode estar
-        // "quebrada" justamente numa tecla sem modificador nenhum, e o
-        // usuário precisa poder capturar exatamente isso.
         if (_capturingSubstitution is not null)
         {
             var sub = _capturingSubstitution;
@@ -151,6 +88,7 @@ public partial class SettingsWindow : Window
             sub.ComboVirtualKey = (uint)KeyInterop.VirtualKeyFromKey(key);
             sub.ComboLabel = BuildComboLabel(sub.ComboShift, sub.ComboCtrl, sub.ComboAlt, key);
             _capturingSubstitution = null;
+            ViewModel.ValidateAll();
             e.Handled = true;
             return;
         }
@@ -173,13 +111,13 @@ public partial class SettingsWindow : Window
 
         if (_capturingStart)
         {
-            _startHotkey = hotkey;
+            ViewModel.StartHotkey = hotkey;
             StartHotkeyBox.Text = hotkey.ToString();
             _capturingStart = false;
         }
         else if (_capturingPause)
         {
-            _pauseHotkey = hotkey;
+            ViewModel.PauseResumeHotkey = hotkey;
             PauseHotkeyBox.Text = hotkey.ToString();
             _capturingPause = false;
         }
@@ -197,11 +135,6 @@ public partial class SettingsWindow : Window
         return string.Join(" + ", parts);
     }
 
-    /// <summary>
-    /// Nome amigável para a tecla capturada, distinguindo explicitamente
-    /// variantes de numpad (o motivo desse recurso existir) de teclas
-    /// equivalentes no teclado principal.
-    /// </summary>
     private static string FriendlyKeyName(Key key) => key switch
     {
         Key.Divide => "/ (numpad)",
@@ -236,17 +169,16 @@ public partial class SettingsWindow : Window
         _ => key.ToString()
     };
 
-    // --- Substituições de caracteres ---
     private void AddSubstitution_Click(object sender, RoutedEventArgs e)
     {
-        _substitutions.Add(new CharacterSubstitution());
+        ViewModel.AddSubstitution();
     }
 
     private void RemoveSubstitution_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: CharacterSubstitution item })
         {
-            _substitutions.Remove(item);
+            ViewModel.RemoveSubstitution(item);
         }
     }
 
@@ -260,70 +192,157 @@ public partial class SettingsWindow : Window
         item.ComboLabel = "Pressione a combinação desejada...";
     }
 
+    private void OpenCalibrationForSubstitution_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CharacterSubstitution item }) return;
+
+        var diag = new DiagnosticsWindow(App.TypingServiceInstance, App.LogServiceInstance, App.CoordinatorInstance)
+        {
+            Owner = this
+        };
+        if (!string.IsNullOrWhiteSpace(item.From))
+        {
+            diag.ViewModel.SelectedCalibrationSymbol = item.From;
+        }
+        diag.ShowDialog();
+
+        // Recarrega as configurações salvas pela janela de calibração caso tenham mudado
+        var reloaded = App.SettingsServiceInstance.Load();
+        var match = reloaded.CharacterSubstitutions.FirstOrDefault(s => string.Equals(s.From, item.From, StringComparison.Ordinal));
+        if (match is not null)
+        {
+            item.Mode = match.Mode;
+            item.SequenceSteps = match.SequenceSteps?.Select(SettingsMapper.CloneSequenceStep).ToList() ?? new();
+            item.ComboLabel = match.ComboLabel;
+            item.ComboVirtualKey = match.ComboVirtualKey;
+            item.ComboShift = match.ComboShift;
+            item.ComboCtrl = match.ComboCtrl;
+            item.ComboAlt = match.ComboAlt;
+        }
+    }
+
+    private void OpenPersistenceFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(ViewModel.PersistenceFolderPath);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = ViewModel.PersistenceFolderPath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Não foi possível abrir a pasta:\n{ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void PurgeDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            "Excluir todos os arquivos de diagnóstico JSONL gravados em disco?",
+            "Excluir diagnósticos",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        var engine = new TypingDiagnosticsEngine();
+        int removed = engine.PurgeAllDiagnostics();
+        MessageBox.Show(this, $"{removed} arquivo(s) de diagnóstico excluído(s).", "Diagnósticos excluídos", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void ClearEmbeddedProfile_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            $"Limpar todos os dados do perfil isolado do WebView2 em:\n{ViewModel.EmbeddedBrowserProfilePath}?",
+            "Limpar dados do perfil",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            if (Directory.Exists(ViewModel.EmbeddedBrowserProfilePath))
+            {
+                Directory.Delete(ViewModel.EmbeddedBrowserProfilePath, recursive: true);
+            }
+            MessageBox.Show(this, "Dados do perfil isolado removidos.", "Perfil limpo", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Não foi possível remover todos os arquivos (feche o navegador integrado primeiro):\n{ex.Message}",
+                "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RestoreCurrentTabDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        string tabKey = (SettingsTabs.SelectedItem as TabItem)?.Tag as string ?? SettingsViewModel.TabDigitacao;
+        string tabHeader = (SettingsTabs.SelectedItem as TabItem)?.Header as string ?? "atual";
+
+        var answer = MessageBox.Show(
+            this,
+            $"Restaurar as configurações da aba '{tabHeader}' para os valores padrão?",
+            "Restaurar padrões da aba",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (answer != MessageBoxResult.Yes) return;
+        ViewModel.RestoreTabDefaults(tabKey);
+    }
+
+    private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            "Restaurar todas as configurações de todas as abas para os valores padrão de fábrica?",
+            "Restaurar todos os padrões",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (answer != MessageBoxResult.Yes) return;
+        ViewModel.RestoreAllDefaults();
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (!int.TryParse(CharDelayBox.Text, out int charDelay) || charDelay < 0)
+        var validation = ViewModel.TryBuildSettings();
+
+        if (!validation.IsValid || validation.Settings is null)
         {
-            MessageBox.Show(this, "Intervalo entre caracteres inválido.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        if (!int.TryParse(EnterDelayBox.Text, out int enterDelay) || enterDelay < 0)
-        {
-            MessageBox.Show(this, "Intervalo após Enter inválido.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        if (!int.TryParse(CountdownBox.Text, out int countdown) || countdown < 0)
-        {
-            MessageBox.Show(this, "Contagem regressiva inválida.", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                this,
+                string.Join("\n", validation.Errors),
+                "Configuração inválida",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
-        _working.CharDelayMs = charDelay;
-        _working.EnterDelayMs = enterDelay;
-        _working.CountdownSeconds = countdown;
-
-        _working.Method = ((MethodCombo.SelectedItem as ComboBoxItem)?.Tag as string) switch
+        if (validation.Warnings.Count > 0)
         {
-            "TecladoFisico" => InputMethod.TecladoFisico,
-            "Unicode" => InputMethod.Unicode,
-            _ => InputMethod.Automatico
-        };
+            var proceed = MessageBox.Show(
+                this,
+                string.Join("\n\n", validation.Warnings) + "\n\nDeseja salvar mesmo assim?",
+                "Aviso de configuração",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (proceed != MessageBoxResult.Yes) return;
+        }
 
-        _working.PreserveOriginalIndentation = PreserveIndentationCheck.IsChecked == true;
+        _settingsService.Save(validation.Settings);
 
-        _working.CharacterSubstitutions = _substitutions
-            .Where(sub => !string.IsNullOrEmpty(sub.From))
-            .Select(sub => new CharacterSubstitution
-            {
-                From = sub.From,
-                To = sub.To,
-                Mode = sub.Mode,
-                ComboShift = sub.ComboShift,
-                ComboCtrl = sub.ComboCtrl,
-                ComboAlt = sub.ComboAlt,
-                ComboVirtualKey = sub.ComboVirtualKey,
-                ComboLabel = sub.ComboLabel
-            })
-            .ToList();
+        // Aplica imediatamente o tema selecionado
+        ThemeManager.Instance.ApplyTheme(validation.Settings.Theme);
 
-        _working.StartHotkey = _startHotkey;
-        _working.PauseResumeHotkey = _pauseHotkey;
-
-        _working.ValidateTargetWindow = ValidateWindowCheck.IsChecked == true;
-        _working.ExpectedBrowser = ((ExpectedBrowserCombo.SelectedItem as ComboBoxItem)?.Tag as string) switch
+        if (System.Windows.Application.Current is App && App.LogServiceInstance is not null)
         {
-            "Chrome" => ExpectedBrowser.Chrome,
-            "Edge" => ExpectedBrowser.Edge,
-            "Firefox" => ExpectedBrowser.Firefox,
-            _ => ExpectedBrowser.Nenhum
-        };
+            App.LogServiceInstance.DetailedTrace = validation.Settings.Features.DetailedTrace;
+        }
 
-        _working.MinimizeToTray = MinimizeToTrayCheck.IsChecked == true;
-        _working.StartMinimized = StartMinimizedCheck.IsChecked == true;
-        _working.AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true;
-        _working.ClearTextAfterCompletion = ClearAfterCompletionCheck.IsChecked == true;
-
-        _settingsService.Save(_working);
         DialogResult = true;
         Close();
     }

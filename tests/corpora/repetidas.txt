@@ -1,0 +1,15 @@
+Palavras reais com letras duplas:
+carro pessoa alla voo compreensao commum sessao ferramenta correr passo
+aa ll ss oo mm ee cc rr tt nn pp
+Sequencia de 10 identicos (a, e, o, s, 1):
+aaaaaaaaaa
+eeeeeeeeee
+oooooooooo
+ssssssssss
+1111111111
+Sequencia de 50 identicos (a, s, 0):
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ssssssssssssssssssssssssssssssssssssssssssssssssss
+00000000000000000000000000000000000000000000000000
+Sequencia de 200 identicos (x):
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

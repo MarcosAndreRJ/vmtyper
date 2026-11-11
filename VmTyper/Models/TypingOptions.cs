@@ -62,4 +62,25 @@ public sealed class TypingOptions
     /// ou digitação — independe do método (Automático/Físico/Unicode).
     /// </summary>
     public IReadOnlyList<CharacterSubstitution> Substitutions { get; init; } = Array.Empty<CharacterSubstitution>();
+
+    /// <summary>Layout de destino ("HostForeground" ou KLID como "00010416" ABNT2, "00020409" US-Intl) (§2.1 N2).</summary>
+    public string TargetLayout { get; init; } = "HostForeground";
+
+    /// <summary>Quando verdadeiro (após decisão no pré-voo §2.1 E), converte unidades Unsupported em Unicode.</summary>
+    public bool FallbackUnsupportedToUnicode { get; init; }
+
+    /// <summary>Callback síncrono opcional invocado imediatamente antes de enviar cada unidade (usado pelo TargetGuard §3.2).</summary>
+    public Func<int, CancellationToken, Task>? BeforeUnitAsync { get; init; }
+
+    /// <summary>
+    /// Perfil de temporização opcional (Fase 2 §2). Quando nulo, usa
+    /// <c>TypingProfile.Legacy(CharDelayMs, EnterDelayMs)</c>.
+    /// </summary>
+    public TypingProfile? Profile { get; init; }
+
+    /// <summary>Quando verdadeiro, grava o JSONL da sessão via <see cref="Services.TypingDiagnosticsEngine"/> (Fase 3 §1).</summary>
+    public bool RecordJsonlDiagnostics { get; init; }
+
+    /// <summary>Quando verdadeiro, aumenta temporariamente o gap se o atraso real exceder o solicitado por sobrecarga de CPU (Fase 3 §7).</summary>
+    public bool EnableAdaptiveSlowdown { get; init; }
 }

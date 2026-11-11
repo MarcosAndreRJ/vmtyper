@@ -1,0 +1,8 @@
+Isolados: ~ ^ ´ ` ¨ ' "
+Seguidos de espaco: ~  ^  ´  `  ¨  '  " 
+Seguidos de vogal compativel: ~a ~o ^a ^e ^o ´a ´e ´i ´o ´u `a ¨u
+Seguidos de consoante: ~n ~s ^t ´r `m 's "t
+Seguidos de si mesmos: ~~ ^^ ´´ `` ¨¨ '' ""
+Combinacoes em expressoes:
+path="~/config" regex="^[a-z]+$" sql='SELECT * FROM tabela WHERE nome = ''teste'''
+cmd=`echo "ola"` ~user/dir ^C ^Z

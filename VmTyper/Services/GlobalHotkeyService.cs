@@ -10,7 +10,7 @@ namespace VmTyper.Services;
 /// As mensagens WM_HOTKEY chegam através do loop de mensagens normal do
 /// thread de UI (Dispatcher), então os handlers já executam na UI thread.
 /// </summary>
-public sealed class GlobalHotkeyService : IDisposable
+public sealed class GlobalHotkeyService : IHotkeyRegistrar, IDisposable
 {
     private const int WmHotkey = Win32.WM_HOTKEY;
 

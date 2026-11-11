@@ -1,0 +1,44 @@
+<Window x:Class="WebView2Poc.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="VmTyper — PoC WebView2 (SendInput vs CDP Input.dispatchKeyEvent)"
+        Width="1080" Height="740"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <!-- Barra superior separada do HWND do WebView2 (Airspace seguro - §1.3 e §5.1) -->
+        <Border DockPanel.Dock="Top" Padding="8" Background="#F4F5F7" BorderBrush="#D0D4DC" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Vertical">
+                <DockPanel Margin="0,0,0,6">
+                    <Button x:Name="BackBtn" Content="◀ Voltar" Click="Back_Click" Padding="8,3" Margin="0,0,4,0"/>
+                    <Button x:Name="ForwardBtn" Content="Avançar ▶" Click="Forward_Click" Padding="8,3" Margin="0,0,4,0"/>
+                    <Button x:Name="ReloadBtn" Content="↻ Atualizar" Click="Reload_Click" Padding="8,3" Margin="0,0,8,0"/>
+                    <Button DockPanel.Dock="Right" Content="Navegar" Click="Navigate_Click" Padding="10,3" Margin="4,0,0,0"/>
+                    <TextBox x:Name="UrlBox" VerticalContentAlignment="Center" FontFamily="Consolas" FontSize="12.5"
+                             Text="https://diag.vmtyper.local/index.html" KeyDown="UrlBox_KeyDown"/>
+                </DockPanel>
+
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Método A: SendInput" Click="RunSendInput_Click" Padding="10,3" Margin="0,0,6,0"/>
+                    <Button Content="Método B1: CDP (Dead+Base)" Click="RunCdpDead_Click" Padding="10,3" Margin="0,0,6,0"/>
+                    <Button Content="Método B2: CDP (Composed)" Click="RunCdpComposed_Click" Padding="10,3" Margin="0,0,6,0"/>
+                    <Button Content="Comparar A vs B1 vs B2" Click="RunComparison_Click" Padding="10,3" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="StatusBanner" Text="Inicializando..." VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Barra inferior de resumo da comparação -->
+        <Border DockPanel.Dock="Bottom" Padding="8" Background="#FAFAFC" BorderBrush="#D0D4DC" BorderThickness="0,1,0,0" MaxHeight="160">
+            <TextBox x:Name="ResultLogBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas" FontSize="11.5" Height="110"/>
+        </Border>
+
+        <!-- Controle WebView2 em área própria sem sobreposição -->
+        <Grid>
+            <wv2:WebView2 x:Name="BrowserView" Visibility="Visible"/>
+            <TextBlock x:Name="RuntimeWarningText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       TextWrapping="Wrap" Margin="32" FontSize="14" Visibility="Collapsed"/>
+        </Grid>
+    </DockPanel>
+</Window>

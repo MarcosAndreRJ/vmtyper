@@ -9,6 +9,33 @@ public enum ExpectedBrowser
 }
 
 /// <summary>
+/// Política de persistência do texto dos blocos em queue.json (§4.2).
+/// </summary>
+public enum QueueTextPersistence
+{
+    Full,
+    Encrypted,
+    None
+}
+
+/// <summary>
+/// Feature flags experimentais e de diagnóstico (princípio transversal §2.2).
+/// </summary>
+public sealed class FeatureFlags
+{
+    public bool AdaptiveTiming { get; set; }
+    public bool TargetGuardStrict { get; set; }
+    public bool EmbeddedBrowser { get; set; }
+    public bool CdpInput { get; set; }
+
+    /// <summary>
+    /// Libera a gravação do caractere em logs de diagnóstico (desligada automaticamente ao fechar o app).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool DetailedTrace { get; set; }
+}
+
+/// <summary>
 /// Representa um atalho global configurável (modificadores + tecla).
 /// </summary>
 public sealed class HotkeyDefinition
@@ -45,6 +72,8 @@ public sealed class AppSettings
     public int EnterDelayMs { get; set; } = 20;
     public InputMethod Method { get; set; } = InputMethod.Automatico;
     public int CountdownSeconds { get; set; } = 3;
+    public string TypingProfile { get; set; } = "Legacy";
+    public TypingProfile? CustomProfile { get; set; }
 
     /// <summary>
     /// Ao iniciar uma nova linha, remove a autoindentação do editor de
@@ -74,10 +103,26 @@ public sealed class AppSettings
     // --- Segurança ---
     public bool ValidateTargetWindow { get; set; }
     public ExpectedBrowser ExpectedBrowser { get; set; } = ExpectedBrowser.Chrome;
+    public bool EnableTargetGuard { get; set; } = true;
+    public string TargetLayout { get; set; } = "HostForeground";
+    public int ResumeCountdownSeconds { get; set; } = 2;
+
+    // --- Ambiente e Diagnóstico ---
+    public string TargetEnvironment { get; set; } = "External";
+    public string EmbeddedSubMethod { get; set; } = "SendInput";
+    public bool EnableDiagnosticsJsonl { get; set; } = true;
+    public int DiagnosticsRetentionSessions { get; set; } = 20;
+
+    // --- Privacidade e recursos ---
+    public QueueTextPersistence QueueTextPersistence { get; set; } = QueueTextPersistence.Full;
+    public FeatureFlags Features { get; set; } = new();
 
     // --- Comportamento ---
     public bool MinimizeToTray { get; set; } = true;
     public bool StartMinimized { get; set; }
     public bool AlwaysOnTop { get; set; }
     public bool ClearTextAfterCompletion { get; set; }
+
+    // --- Aparência ---
+    public AppTheme Theme { get; set; } = AppTheme.Auto;
 }

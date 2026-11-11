@@ -1,0 +1,49 @@
+<Window x:Class="VmTyper.Views.EmbeddedBrowserWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Navegador Integrado (Experimental) — VmTyper"
+        Style="{StaticResource AppWindowStyle}"
+        Width="980" Height="680"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <!-- Barra superior separada do HWND do WebView2 (sem sobreposição de airspace - Fase 4 §5.1) -->
+        <Border DockPanel.Dock="Top" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Background="{DynamicResource SurfaceBrush}">
+            <StackPanel Orientation="Vertical">
+                <DockPanel Margin="0,0,0,6">
+                    <Button x:Name="BackButton" Content="◀ Voltar" Click="Back_Click" Padding="8,3" Margin="0,0,4,0"
+                            AutomationProperties.Name="Voltar página"/>
+                    <Button x:Name="ForwardButton" Content="Avançar ▶" Click="Forward_Click" Padding="8,3" Margin="0,0,4,0"
+                            AutomationProperties.Name="Avançar página"/>
+                    <Button x:Name="ReloadButton" Content="↻ Atualizar" Click="Reload_Click" Padding="8,3" Margin="0,0,8,0"
+                            AutomationProperties.Name="Atualizar página"/>
+                    <Button DockPanel.Dock="Right" Content="Ir" Click="Navigate_Click" Padding="12,3" Margin="4,0,0,0"
+                            AutomationProperties.Name="Navegar para o endereço"/>
+                    <TextBox x:Name="AddressTextBox" VerticalContentAlignment="Center" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12.5"
+                             Text="https://diag.vmtyper.local/index.html" KeyDown="AddressTextBox_KeyDown"/>
+                </DockPanel>
+
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Modo:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="ModeComboBox" Width="230" SelectedIndex="0" Margin="0,0,12,0">
+                        <ComboBoxItem Content="Externo (padrão)" Tag="External"/>
+                        <ComboBoxItem Content="Integrado + SendInput" Tag="EmbeddedSendInput"/>
+                        <ComboBoxItem Content="Integrado + CDP (experimental)" Tag="EmbeddedCdp"/>
+                    </ComboBox>
+                    <TextBlock x:Name="NavigationStatusText" Text="Pronto" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="FocusStatusText" VerticalAlignment="Center" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12"
+                               Text="Janela: ok | Controle: desconhecido | Doc: desconhecido | VM pronta: desconhecido"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Área dedicada ao host WebView2 (carregado sob demanda somente quando a flag EmbeddedBrowser está ativa) -->
+        <Border x:Name="BrowserHostContainer" Background="{DynamicResource SurfaceBrush}">
+            <TextBlock x:Name="PlaceholderText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="24" FontSize="13">
+                Navegador integrado experimental desligado por padrão (Features.EmbeddedBrowser = false).
+                Para executar a PoC completa com WebView2 e comparação SendInput × CDP, utilize o projeto isolado experiments/WebView2Poc.
+            </TextBlock>
+        </Border>
+    </DockPanel>
+</Window>
+

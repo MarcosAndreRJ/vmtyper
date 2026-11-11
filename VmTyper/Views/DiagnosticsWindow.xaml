@@ -1,44 +1,386 @@
 <Window x:Class="VmTyper.Views.DiagnosticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Teste de Teclado — VmTyper"
-        Width="620" Height="560"
-        WindowStartupLocation="CenterOwner">
+        xmlns:helpers="clr-namespace:VmTyper.Helpers"
+        xmlns:services="clr-namespace:VmTyper.Services"
+        Title="Painel de Diagnóstico — VmTyper"
+        Style="{StaticResource AppWindowStyle}"
+        Width="860" Height="660" MinWidth="720" MinHeight="540"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackgroundBrush}">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="1.2*"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8">
-            Use este modo para testar rapidamente se os caracteres estão sendo enviados corretamente
-            para o console VMware. Edite o texto abaixo se quiser testar caracteres específicos, clique
-            em "Enviar teste", aguarde a contagem regressiva e clique no campo de destino dentro da VM.
-        </TextBlock>
+        <!-- Legenda fixa obrigatória dos 5 estados de entrega (§4) -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="Semântica de Entrega (a cor nunca é a única pista; 'Confirmado' nunca vem apenas de SendInput):"
+                           FontWeight="Bold" FontSize="12" Margin="0,0,0,4"/>
+                <ItemsControl ItemsSource="{Binding LegendBadges}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="3" Padding="6,2" Margin="0,0,8,4"
+                                    helpers:BadgeColors.Hex="{Binding ColorHex}" BorderThickness="1"
+                                    ToolTip="{Binding Description}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding FullLabel}" FontWeight="Bold" helpers:BadgeColors.Hex="{Binding ColorHex}" FontSize="12" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
 
-        <TextBox Grid.Row="1" x:Name="TestTextBox" AcceptsReturn="True" TextWrapping="Wrap"
-                  FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Auto"/>
+        <TabControl Grid.Row="1">
+            <!-- Aba 1: Sessão atual / última -->
+            <TabItem Header="Sessão atual / última">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Método:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="MethodCombo" Width="220" SelectedIndex="0">
-                <ComboBoxItem Content="Automático" Tag="Automatico"/>
-                <ComboBoxItem Content="Teclado físico" Tag="TecladoFisico"/>
-                <ComboBoxItem Content="Unicode" Tag="Unicode"/>
-            </ComboBox>
-        </StackPanel>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="Recarregar última sessão" Click="ReloadLatestSession_Click"
+                                    AutomationProperties.Name="Recarregar última sessão"/>
+                            <Button Content="Abrir arquivo .jsonl..." Click="OpenSessionFile_Click"
+                                    AutomationProperties.Name="Abrir arquivo JSONL de sessão"/>
+                            <Button Content="Excluir diagnósticos" Click="PurgeDiagnostics_Click"
+                                    AutomationProperties.Name="Excluir arquivos de diagnóstico"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SessionHeaderSummary}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </DockPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
-            <Button Content="Enviar teste" Click="SendTest_Click" MinWidth="120"/>
-            <Button Content="Cancelar (ESC)" Click="Cancel_Click" MinWidth="120"/>
-            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Bold"/>
-        </StackPanel>
+                    <TextBlock Grid.Row="1" Text="{Binding SessionTotalsSummary}" Foreground="{DynamicResource InfoTextBrush}" FontWeight="Bold" Margin="0,0,0,6"/>
 
-        <GroupBox Grid.Row="4" Header="Log de diagnóstico (caracteres não suportados aparecem aqui)">
-            <ListBox x:Name="LogListBox" FontFamily="Consolas" FontSize="11"/>
-        </GroupBox>
+                    <DataGrid Grid.Row="2" ItemsSource="{Binding TimelineEvents}" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="50"/>
+                            <DataGridTextColumn Header="Categoria" Binding="{Binding Category}" Width="95"/>
+                            <DataGridTextColumn Header="Método" Binding="{Binding Method}" Width="95"/>
+                            <DataGridTextColumn Header="Gap (solic. → obtido)" Binding="{Binding GapComparison}" Width="155"/>
+                            <DataGridTextColumn Header="Hold (solic. → obtido)" Binding="{Binding HoldComparison}" Width="155"/>
+                            <DataGridTextColumn Header="Retorno" Binding="{Binding Result}" Width="80"/>
+                            <DataGridTemplateColumn Header="Estado Semântico" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="2" Padding="4,1" helpers:BadgeColors.Hex="{Binding Badge.ColorHex}">
+                                            <TextBlock Text="{Binding Badge.FullLabel}" helpers:BadgeColors.Hex="{Binding Badge.ColorHex}" FontWeight="Bold"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Aba 2: Teste de teclado -->
+            <TabItem Header="Teste de teclado">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="2*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1.2*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8">
+                        Use este modo para testar rapidamente se os caracteres estão sendo enviados corretamente
+                        para o console VMware. Edite o texto abaixo se quiser testar caracteres específicos, clique
+                        em "Enviar teste", aguarde a contagem regressiva e clique no campo de destino dentro da VM.
+                    </TextBlock>
+
+                    <TextBox Grid.Row="1" x:Name="TestTextBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                             FontFamily="{DynamicResource EditorFontFamily}" FontSize="13.5" VerticalScrollBarVisibility="Auto"
+                             TextChanged="TestTextBox_TextChanged"
+                             AutomationProperties.Name="Texto de teste de teclado"/>
+
+                    <TextBlock Grid.Row="2" x:Name="ExpectedFingerprintText" Margin="0,6,0,2"
+                               FontFamily="{DynamicResource EditorFontFamily}" FontSize="12" TextWrapping="Wrap"/>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Método:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="MethodCombo" Width="220" SelectedIndex="0"
+                                  AutomationProperties.Name="Método do teste de teclado">
+                            <ComboBoxItem Content="Automático" Tag="Automatico"/>
+                            <ComboBoxItem Content="Teclado físico" Tag="TecladoFisico"/>
+                            <ComboBoxItem Content="Unicode" Tag="Unicode"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
+                        <Button Content="Enviar teste" Click="SendTest_Click" MinWidth="120"
+                                AutomationProperties.Name="Enviar teste de teclado"/>
+                        <Button Content="Cancelar (ESC)" Click="Cancel_Click" MinWidth="120"
+                                AutomationProperties.Name="Cancelar teste de teclado"/>
+                        <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Bold"/>
+                    </StackPanel>
+
+                    <GroupBox Grid.Row="5" Header="Log de diagnóstico (caracteres não suportados aparecem aqui)">
+                        <ListBox x:Name="LogListBox" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12"/>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <!-- Aba 3: Comparação -->
+            <TabItem Header="Comparação">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="110"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                        <Button DockPanel.Dock="Right" Content="Importar JSON do receptor / página..." Click="ImportObserverJson_Click"
+                                AutomationProperties.Name="Importar JSON do receptor ou página"/>
+                        <TextBlock Text="Texto esperado para comparação (ou deixe o texto do teste):" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </DockPanel>
+
+                    <TextBox Grid.Row="1" Text="{Binding ComparisonExpectedText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                             FontFamily="{DynamicResource EditorFontFamily}" FontSize="12" VerticalScrollBarVisibility="Auto"
+                             AutomationProperties.Name="Texto esperado para comparação"/>
+
+                    <Border Grid.Row="2" Margin="0,8,0,8" Padding="8" CornerRadius="3"
+                            helpers:BadgeColors.Hex="{Binding ComparisonDeliveryBadge.ColorHex}"
+                             BorderThickness="1">
+                        <TextBlock Text="{Binding ComparisonSummaryText}" FontWeight="Bold"
+                                   helpers:BadgeColors.Hex="{Binding ComparisonDeliveryBadge.ColorHex}" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <DataGrid Grid.Row="3" ItemsSource="{Binding ComparisonItems}" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Classe" Binding="{Binding Kind}" Width="145"/>
+                            <DataGridTextColumn Header="Pos. Esperada" Binding="{Binding ExpectedIndex}" Width="95"/>
+                            <DataGridTextColumn Header="Pos. Recebida" Binding="{Binding ActualIndex}" Width="95"/>
+                            <DataGridTextColumn Header="Cat. Esperada" Binding="{Binding ExpectedCategory}" Width="100"/>
+                            <DataGridTextColumn Header="Cat. Recebida" Binding="{Binding ActualCategory}" Width="100"/>
+                            <DataGridTextColumn Header="Contexto (±5)" Binding="{Binding ContextWindow}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Aba 4: Desempenho por método/perfil -->
+            <TabItem Header="Desempenho por método/perfil">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                        <Button DockPanel.Dock="Right" Content="Recarregar benchmarks" Click="ReloadBenchmarks_Click"
+                                AutomationProperties.Name="Recarregar tabela de benchmarks"/>
+                        <TextBlock Text="Benchmarks executados (lidos de relatorios/F3-dados):" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </DockPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding BenchmarkRows}" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Origem" Binding="{Binding Source}" Width="95"/>
+                            <DataGridTextColumn Header="Corpus" Binding="{Binding Corpus}" Width="165"/>
+                            <DataGridTextColumn Header="Método" Binding="{Binding Method}" Width="175"/>
+                            <DataGridTextColumn Header="Perfil" Binding="{Binding Profile}" Width="115"/>
+                            <DataGridTextColumn Header="Esperado" Binding="{Binding ExpectedLength}" Width="70"/>
+                            <DataGridTextColumn Header="Recebido" Binding="{Binding ActualLength}" Width="70"/>
+                            <DataGridTextColumn Header="SHA-256(12)" Binding="{Binding Sha12}" Width="105"/>
+                            <DataGridTextColumn Header="Div." Binding="{Binding Divergences}" Width="50"/>
+                            <DataGridTemplateColumn Header="Estado" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="2" Padding="4,1" helpers:BadgeColors.Hex="{Binding Badge.ColorHex}">
+                                            <TextBlock Text="{Binding Badge.FullLabel}" helpers:BadgeColors.Hex="{Binding Badge.ColorHex}" FontWeight="Bold"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Aba 5: Calibração VM (Barra e Acentos) (§Tarefas 1, 3 e 4) -->
+            <TabItem Header="Calibração VM (Barra e Acentos)">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Cabeçalho explicativo -->
+                        <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="Diagnóstico e Calibração de Teclas Físicas no Console VMware HTML5"
+                                           FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    O console HTML5 intercepta eventos de teclado pelo navegador. Teste candidatos físicos individualmente no console da VM, valide o resultado observado visualmente e salve o mapeamento aprovado diretamente no perfil da VM.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Diagnóstico Rápido da Barra (Tarefa 1) -->
+                        <GroupBox Grid.Row="1" Header="Diagnóstico Rápido da Barra ('/') — Testes Individuais" Margin="0,0,0,10" Padding="8">
+                            <StackPanel>
+                                <TextBlock Text="Dispare testes rápidos com contagem regressiva de 3s para testar cada implementação física da barra:"
+                                           FontSize="12" Margin="0,0,0,8"/>
+                                <WrapPanel>
+                                    <Button Content="1. Numpad Divide (E0 35)" Click="QuickTestNumpadDivide_Click" Margin="0,0,8,6" Padding="8,4"
+                                            ToolTip="VK_DIVIDE (0x6F), Scan 0x35 estendido com flag E0"
+                                            AutomationProperties.Name="Testar Barra Numpad Divide"/>
+                                    <Button Content="2. Tecla ABNT2 (Scan 0x73)" Click="QuickTestAbnt2Slash_Click" Margin="0,0,8,6" Padding="8,4"
+                                            ToolTip="VK_ABNT_C1 (0xC1), Scan 0x73 próxima ao Shift direito"
+                                            AutomationProperties.Name="Testar Barra ABNT2"/>
+                                    <Button Content="3. Tecla US (Scan 0x35)" Click="QuickTestUsSlash_Click" Margin="0,0,8,6" Padding="8,4"
+                                            ToolTip="VK_OEM_2 (0xBF), Scan 0x35 não-estendida"
+                                            AutomationProperties.Name="Testar Barra US"/>
+                                    <Button Content="4. AltGr + Q" Click="QuickTestAltGrQ_Click" Margin="0,0,8,6" Padding="8,4"
+                                            ToolTip="Ctrl + Alt + Q (Scan 0x10)"
+                                            AutomationProperties.Name="Testar AltGr + Q"/>
+                                    <Button Content="5. Alt + 47 (Numpad)" Click="QuickTestAltNumpad47_Click" Margin="0,0,8,6" Padding="8,4"
+                                            ToolTip="Sequência Alt Down, Numpad 4, Numpad 7, Alt Up"
+                                            AutomationProperties.Name="Testar Alt 47 Numpad"/>
+                                    <Button Content="Limpar Teclas Mortas (Flush)" Click="FlushDeadKey_Click" Margin="0,0,8,6" Padding="8,4"
+                                            Background="{DynamicResource DangerBackgroundBrush}" BorderBrush="{DynamicResource DangerBrush}"
+                                            ToolTip="Envia Space + Backspace para limpar qualquer estado de tecla morta pendente"
+                                            AutomationProperties.Name="Limpar Teclas Mortas"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Seletor de Caractere e Candidato (Tarefa 4) -->
+                        <GroupBox Grid.Row="2" Header="Calibração por Caractere" Margin="0,0,0,10" Padding="8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Caractere alvo:" VerticalAlignment="Center" Margin="0,0,10,8" FontWeight="SemiBold"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CalibrationSymbolCombo"
+                                          ItemsSource="{Binding AvailableSymbols}"
+                                          SelectedItem="{Binding SelectedCalibrationSymbol, Mode=TwoWay}"
+                                          IsEditable="True" Width="140" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                          AutomationProperties.Name="Selecionar caractere alvo para calibração"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Candidato físico:" VerticalAlignment="Center" Margin="0,0,10,8" FontWeight="SemiBold"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CalibrationCandidateCombo"
+                                          ItemsSource="{Binding AvailableCandidates}"
+                                          SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}"
+                                          DisplayMemberPath="Name" Margin="0,0,0,8"
+                                          AutomationProperties.Name="Selecionar candidato físico"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                           Text="{Binding SelectedCandidate.TechnicalDetails}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- Detalhes dos Passos da Sequência -->
+                        <GroupBox Grid.Row="3" Header="Passos da Sequência Física do Candidato" Margin="0,0,0,10" Padding="8">
+                            <DataGrid ItemsSource="{Binding CalibrationSequenceSteps}" AutoGenerateColumns="False" IsReadOnly="True"
+                                      CanUserAddRows="False" FontFamily="{DynamicResource EditorFontFamily}" FontSize="12" MaxHeight="180">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Ação" Binding="{Binding Action}" Width="80"/>
+                                    <DataGridTextColumn Header="VK (Hex)" Binding="{Binding VirtualKey, StringFormat='0x{0:X2}'}" Width="80"/>
+                                    <DataGridTextColumn Header="Scan (Hex)" Binding="{Binding ScanCode, StringFormat='0x{0:X2}'}" Width="85"/>
+                                    <DataGridTextColumn Header="Estendida (E0)" Binding="{Binding Extended}" Width="100"/>
+                                    <DataGridCheckBoxColumn Header="Shift" Binding="{Binding Shift}" Width="55"/>
+                                    <DataGridCheckBoxColumn Header="Ctrl" Binding="{Binding Ctrl}" Width="55"/>
+                                    <DataGridCheckBoxColumn Header="Alt" Binding="{Binding Alt}" Width="55"/>
+                                    <DataGridCheckBoxColumn Header="AltGr" Binding="{Binding AltGr}" Width="55"/>
+                                    <DataGridTextColumn Header="Pausa (ms)" Binding="{Binding DelayMs}" Width="80"/>
+                                    <DataGridTextColumn Header="Descrição" Binding="{Binding Label}" Width="*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+
+                        <!-- Execução da Tentativa e Feedback do Usuário -->
+                        <GroupBox Grid.Row="4" Header="Executar Tentativa e Avaliar Resultado na VM" Margin="0,0,0,10" Padding="8">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button Content="Testar Candidato na VM (3s)" Click="SendCalibrationAttempt_Click"
+                                            FontWeight="Bold" Padding="12,6" Style="{StaticResource PrimaryButtonStyle}"
+                                            AutomationProperties.Name="Enviar tentativa de calibração para a VM"/>
+                                    <TextBlock x:Name="CalibrationCountdownText" Text="{Binding CalibrationStatusMessage}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                </DockPanel>
+
+                                <Grid Margin="0,8,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="200"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="O que apareceu na VM?" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CalibrationObservedResult, UpdateSourceTrigger=PropertyChanged}"
+                                             FontFamily="{DynamicResource EditorFontFamily}" FontSize="13" VerticalAlignment="Center"
+                                             AutomationProperties.Name="Resultado observado no console da VM"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
+                                        <Button Content="Validado com Sucesso" Click="MarkCalibrationConfirmed_Click" Margin="0,0,6,0" Padding="8,4"
+                                                Background="{DynamicResource SuccessBackgroundBrush}" BorderBrush="{DynamicResource SuccessBrush}" FontWeight="SemiBold"
+                                                AutomationProperties.Name="Marcar tentativa como validada"/>
+                                        <Button Content="Incorreto" Click="MarkCalibrationFailed_Click" Margin="0,0,6,0" Padding="8,4"
+                                                Background="{DynamicResource DangerBackgroundBrush}" BorderBrush="{DynamicResource DangerBrush}"
+                                                AutomationProperties.Name="Marcar tentativa como incorreta"/>
+                                        <Button Content="Não Confirmado" Click="MarkCalibrationUnconfirmed_Click" Padding="8,4"
+                                                Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBrush}"
+                                                AutomationProperties.Name="Marcar tentativa como não confirmada"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="3" Margin="10,0,0,0" Padding="6,3" CornerRadius="3" VerticalAlignment="Center"
+                                            helpers:BadgeColors.Hex="{Binding CalibrationDeliveryBadge.ColorHex}"
+                                             BorderThickness="1">
+                                        <TextBlock Text="{Binding CalibrationDeliveryBadge.FullLabel}"
+                                                   helpers:BadgeColors.Hex="{Binding CalibrationDeliveryBadge.ColorHex}" FontWeight="Bold" FontSize="12"/>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Persistência no Perfil da VM -->
+                        <Border Grid.Row="5" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Salvar Mapeamento Aprovado no Perfil da VM"
+                                        Click="SaveApprovedCalibration_Click"
+                                        FontWeight="Bold" Padding="12,6" Style="{StaticResource PrimaryButtonStyle}"
+                                        AutomationProperties.Name="Salvar calibração aprovada no perfil da VM"/>
+                                <TextBlock Text="Ao aprovar uma combinação/sequência, clique para gravá-la em AppSettings. As substituições existentes serão preservadas."
+                                           VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>

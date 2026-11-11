@@ -74,6 +74,12 @@ internal static class Win32
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
+    // Sobrecarga usada por Win32InputInjector: recebe o primeiro elemento de
+    // um ReadOnlySpan<INPUT> (INPUT é blittable, então o runtime só fixa o
+    // ponteiro, sem cópia).
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint nInputs, ref INPUT pInputs, int cbSize);
+
     public static readonly int InputSize = Marshal.SizeOf(typeof(INPUT));
 
     // ---------------------------------------------------------------
@@ -86,24 +92,47 @@ internal static class Win32
     public const ushort VK_RCONTROL = 0xA3;
     public const ushort VK_LMENU = 0xA4; // Alt esquerdo
     public const ushort VK_RMENU = 0xA5; // Alt direito / AltGr
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_RWIN = 0x5C;
+    public const ushort VK_APPS = 0x5D;
+    public const ushort VK_SNAPSHOT = 0x2C;
+    public const ushort VK_DIVIDE = 0x6F;
+    public const ushort VK_SPACE = 0x20;
     public const ushort VK_RETURN = 0x0D;
     public const ushort VK_TAB = 0x09;
     public const ushort VK_ESCAPE = 0x1B;
+    public const ushort VK_BACK = 0x08;
     public const ushort VK_SHIFT = 0x10;
     public const ushort VK_CONTROL = 0x11;
     public const ushort VK_MENU = 0x12;
     public const ushort VK_HOME = 0x24;
     public const ushort VK_DELETE = 0x2E;
+    public const ushort VK_OEM_2 = 0xBF;      // /? no teclado US
+    public const ushort VK_ABNT_C1 = 0xC1;    // /? no teclado ABNT2 (próxima ao Shift direito)
+    public const ushort VK_ABNT_C2 = 0xC2;    // Ponto/vírgula numérico no teclado ABNT2
+    public const ushort VK_NUMPAD0 = 0x60;
+    public const ushort VK_NUMPAD1 = 0x61;
+    public const ushort VK_NUMPAD2 = 0x62;
+    public const ushort VK_NUMPAD3 = 0x63;
+    public const ushort VK_NUMPAD4 = 0x64;
+    public const ushort VK_NUMPAD5 = 0x65;
+    public const ushort VK_NUMPAD6 = 0x66;
+    public const ushort VK_NUMPAD7 = 0x67;
+    public const ushort VK_NUMPAD8 = 0x68;
+    public const ushort VK_NUMPAD9 = 0x69;
 
     /// <summary>
-    /// Teclas que o Windows trata como "estendidas" e que exigem o flag
-    /// KEYEVENTF_EXTENDEDKEY para que o scan code seja interpretado
-    /// corretamente (ex.: Alt/Ctrl direitos, setas, Insert/Delete etc.).
+    /// Tabela de fallback das teclas que o Windows trata como "estendidas" e
+    /// que exigem o flag KEYEVENTF_EXTENDEDKEY (§2.1 G).
     /// </summary>
     public static bool IsExtendedKey(ushort vk) => vk switch
     {
         VK_RMENU => true,
         VK_RCONTROL => true,
+        VK_DIVIDE => true,
+        VK_LWIN or VK_RWIN => true,
+        VK_APPS => true,
+        VK_SNAPSHOT => true,
         0x21 or 0x22 or 0x23 or 0x24 => true, // PageUp/PageDown/End/Home
         0x25 or 0x26 or 0x27 or 0x28 => true, // Setas
         0x2D or 0x2E => true,                  // Insert/Delete
@@ -122,10 +151,21 @@ internal static class Win32
     public static extern uint MapVirtualKeyEx(uint uCode, uint uMapType, IntPtr dwhkl);
 
     public const uint MAPVK_VK_TO_VSC = 0;
+    public const uint MAPVK_VSC_TO_VK = 1;
+    public const uint MAPVK_VK_TO_CHAR = 2;
+    public const uint MAPVK_VSC_TO_VK_EX = 3;
     public const uint MAPVK_VK_TO_VSC_EX = 4;
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetKeyboardLayout(uint idThread);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
+
+    public const uint KLF_NOTELLSHELL = 0x00000080;
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int vKey);
 
     // ---------------------------------------------------------------
     // Janela ativa / processo em primeiro plano
@@ -135,6 +175,13 @@ internal static class Win32
     public static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    public const uint GA_PARENT = 1;
+    public const uint GA_ROOT = 2;
+    public const uint GA_ROOTOWNER = 3;
+
+    [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -142,6 +189,32 @@ internal static class Win32
 
     [DllImport("user32.dll")]
     public static extern int GetWindowTextLength(IntPtr hWnd);
+
+    public delegate void WinEventDelegate(
+        IntPtr hWinEventHook,
+        uint eventType,
+        IntPtr hwnd,
+        int idObject,
+        int idChild,
+        uint dwEventThread,
+        uint dwmsEventTime);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        IntPtr hmodWinEventProc,
+        WinEventDelegate lpfnWinEventProc,
+        uint idProcess,
+        uint idThread,
+        uint dwFlags);
+
+    [DllImport("user32.dll")]
+    public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+    public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+    public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 
     // ---------------------------------------------------------------
     // Hotkeys globais
@@ -284,14 +357,17 @@ internal static class Win32
     /// e atômico do ponto de vista da fila de entrada do que várias chamadas
     /// separadas para cada tecla).
     /// </summary>
-    public static void SendInputs(IReadOnlyList<INPUT> inputs)
+    public static void SendInputs(IReadOnlyList<INPUT> inputs) => SendInputs(Win32InputInjector.Instance, inputs);
+
+    /// <inheritdoc cref="SendInputs(IReadOnlyList{INPUT})"/>
+    public static void SendInputs(IInputInjector injector, IReadOnlyList<INPUT> inputs)
     {
         if (inputs.Count == 0) return;
         var array = inputs as INPUT[] ?? new List<INPUT>(inputs).ToArray();
-        uint sent = SendInput((uint)array.Length, array, InputSize);
+        uint sent = injector.Send(array);
         if (sent != array.Length)
         {
-            int error = Marshal.GetLastWin32Error();
+            int error = injector.LastError;
             throw new InvalidOperationException(
                 $"SendInput enviou apenas {sent}/{array.Length} eventos. Código de erro Win32: {error}.");
         }
@@ -302,7 +378,10 @@ internal static class Win32
     /// aplicativo eventualmente usa, para garantir que nenhuma fique
     /// "logicamente pressionada" em caso de cancelamento ou exceção.
     /// </summary>
-    public static void ReleaseAllModifiers()
+    public static void ReleaseAllModifiers() => ReleaseAllModifiers(Win32InputInjector.Instance);
+
+    /// <inheritdoc cref="ReleaseAllModifiers()"/>
+    public static void ReleaseAllModifiers(IInputInjector injector)
     {
         var ups = new List<INPUT>
         {
@@ -315,7 +394,7 @@ internal static class Win32
         };
         try
         {
-            SendInputs(ups);
+            SendInputs(injector, ups);
         }
         catch
         {
