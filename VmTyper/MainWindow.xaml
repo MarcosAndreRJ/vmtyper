@@ -791,8 +791,6 @@
 
                                                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
                                                          IsReadOnly="{Binding IsTypingOrPaused}"
-                                                         IsInactiveSelectionHighlightEnabled="True"
-                                                         SelectionBrush="#FFB300" SelectionOpacity="0.6"
                                                          helpers:TextBoxHighlight.Range="{Binding TypingHighlight}"
                                                          AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                                                          MaxHeight="150" VerticalScrollBarVisibility="Auto"
