@@ -13,6 +13,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Company>VmTyper</Company>
     <Product>VmTyper</Product>
@@ -26,6 +27,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\Syntax\*.xshd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ícone do app: no executável (ApplicationIcon), nas janelas (AppWindowStyle) e na barra superior -->
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
   <ItemGroup>

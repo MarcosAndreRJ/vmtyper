@@ -10,6 +10,7 @@
         <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="Icon" Value="pack://application:,,,/VmTyper;component/Assets/app.ico"/>
     </Style>
 
     <!-- Rótulo de ícone (Segoe MDL2 Assets) -->

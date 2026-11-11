@@ -183,10 +183,10 @@
 
                 <!-- Marca -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="30" Height="30" CornerRadius="8" Background="{DynamicResource AccentFillBrush}">
-                        <TextBlock Text="&#xE765;" FontFamily="{DynamicResource IconFontFamily}" FontSize="15"
-                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <Image x:Name="BrandIcon" Width="30" Height="30"
+                           Source="pack://application:,,,/VmTyper;component/Assets/app.ico"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           AutomationProperties.Name="Ícone do VmTyper"/>
                     <TextBlock Text="VmTyper" FontSize="18" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
