@@ -1,4 +1,6 @@
 using System.Windows;
+using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Rendering;
 using ICSharpCode.AvalonEdit.Search;
 using VmTyper.Models;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -258,6 +260,91 @@ public partial class CodeEditorControl : WpfUserControl
     }
 
     public void FocusEditor() => TextEditor.Focus();
+
+    /// <summary>Destaca o trecho em digitação (offset &lt; 0 ou length 0 remove o destaque) e o mantém visível.</summary>
+    public void SetTypingHighlight(int offset, int length)
+    {
+        try
+        {
+            var doc = TextEditor.Document;
+            if (doc == null) return;
+
+            _typingHighlight ??= InstallTypingHighlight();
+            if (offset < 0 || length <= 0 || offset >= doc.TextLength)
+            {
+                _typingHighlight.Segment = null;
+            }
+            else
+            {
+                length = Math.Min(length, doc.TextLength - offset);
+                _typingHighlight.Segment = new TextSegment { StartOffset = offset, Length = length };
+                BringLineIntoView(doc.GetLineByOffset(offset).LineNumber);
+            }
+            TextEditor.TextArea.TextView.InvalidateLayer(KnownLayer.Selection);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CodeEditorControl] Erro ao destacar digitação: {ex.Message}");
+        }
+    }
+
+    private TypingHighlightRenderer InstallTypingHighlight()
+    {
+        var renderer = new TypingHighlightRenderer(TextEditor.TextArea.TextView, () =>
+            TryFindResource("EditorTypingHighlightBrush") as System.Windows.Media.Brush ?? DefaultHighlightBrush);
+        TextEditor.TextArea.TextView.BackgroundRenderers.Add(renderer);
+        return renderer;
+    }
+
+    private static readonly System.Windows.Media.Brush DefaultHighlightBrush = CreateDefaultHighlightBrush();
+
+    private static System.Windows.Media.Brush CreateDefaultHighlightBrush()
+    {
+        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0x99, 0xFF, 0xB3, 0x00));
+        brush.Freeze();
+        return brush;
+    }
+
+    private void BringLineIntoView(int line)
+    {
+        var view = TextEditor.TextArea.TextView;
+        if (!view.VisualLinesValid || view.VisualLines.Count == 0) return;
+        int first = view.VisualLines[0].FirstDocumentLine.LineNumber;
+        int last = view.VisualLines[^1].LastDocumentLine.LineNumber;
+        if (line <= first || line >= last)
+        {
+            TextEditor.ScrollToLine(line);
+        }
+    }
+
+    private TypingHighlightRenderer? _typingHighlight;
+
+    private sealed class TypingHighlightRenderer : IBackgroundRenderer
+    {
+        private readonly TextView _view;
+        private readonly Func<System.Windows.Media.Brush> _brush;
+
+        public TypingHighlightRenderer(TextView view, Func<System.Windows.Media.Brush> brush)
+        {
+            _view = view;
+            _brush = brush;
+        }
+
+        public TextSegment? Segment { get; set; }
+
+        public KnownLayer Layer => KnownLayer.Selection;
+
+        public void Draw(TextView textView, System.Windows.Media.DrawingContext drawingContext)
+        {
+            if (Segment is not { } segment || !textView.VisualLinesValid) return;
+            var builder = new BackgroundGeometryBuilder { CornerRadius = 2, AlignToWholePixels = true };
+            builder.AddSegment(textView, segment);
+            if (builder.CreateGeometry() is { } geometry)
+            {
+                drawingContext.DrawGeometry(_brush(), null, geometry);
+            }
+        }
+    }
 
     /// <summary>Move o cursor para o início da linha informada (1-based, limitada ao documento).</summary>
     public void GoToLine(int line)

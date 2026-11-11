@@ -935,7 +935,8 @@ public sealed class MainViewModel : ObservableObject
         _activeLease = lease;
         try
         {
-            await TypeTextPayloadAsync(selectedText, "Seleção do editor", lease).ConfigureAwait(true);
+            await TypeTextPayloadAsync(selectedText, "Seleção do editor", lease,
+                EditorSelectionStartProvider?.Invoke() ?? -1).ConfigureAwait(true);
         }
         finally
         {
@@ -970,7 +971,7 @@ public sealed class MainViewModel : ObservableObject
         block.Status = TextBlockStatus.Typing;
         try
         {
-            bool ok = await TypeTextPayloadAsync(textToType, $"Bloco Inteligente: {block.Title} ({block.LineRangeDisplay})", lease).ConfigureAwait(true);
+            bool ok = await TypeTextPayloadAsync(textToType, $"Bloco Inteligente: {block.Title} ({block.LineRangeDisplay})", lease, block.StartOffset).ConfigureAwait(true);
             block.Status = ok ? TextBlockStatus.Sent : TextBlockStatus.Failed;
         }
         catch
@@ -984,7 +985,67 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private async Task<bool> TypeTextPayloadAsync(string textToType, string description, TypingSessionLease lease)
+    /// <summary>
+    /// Disparado a cada unidade digitada com o trecho (offset, comprimento) do documento do editor
+    /// que contém a palavra em digitação; (-1, 0) limpa o destaque.
+    /// </summary>
+    public event Action<int, int>? TypingHighlightChanged;
+
+    /// <summary>Fornece o início da seleção atual do editor (para destacar a digitação de uma seleção).</summary>
+    public Func<int>? EditorSelectionStartProvider { get; set; }
+
+    /// <summary>Converte offsets do texto normalizado (CRLF/CR → LF) em offsets do texto original.</summary>
+    internal static int[] BuildNormalizedToRawMap(string raw)
+    {
+        var map = new List<int>(raw.Length + 1);
+        for (int i = 0; i < raw.Length; i++)
+        {
+            if (raw[i] == '\r' && i + 1 < raw.Length && raw[i + 1] == '\n') continue;
+            map.Add(i);
+        }
+        map.Add(raw.Length);
+        return map.ToArray();
+    }
+
+    /// <summary>Expande a posição para a palavra (letras, dígitos e '_') ou, fora de palavra, para o próprio caractere.</summary>
+    internal static (int Start, int Length) ExpandToWord(string text, int index, int length)
+    {
+        if (index < 0 || index >= text.Length) return (-1, 0);
+        static bool IsWord(char c) => char.IsLetterOrDigit(c) || c == '_';
+        if (!IsWord(text[index]))
+        {
+            return char.IsWhiteSpace(text[index]) ? (-1, 0) : (index, Math.Max(1, length));
+        }
+        int start = index;
+        while (start > 0 && IsWord(text[start - 1])) start--;
+        int end = index + 1;
+        while (end < text.Length && IsWord(text[end])) end++;
+        return (start, end - start);
+    }
+
+    private Helpers.DirectProgress<TypingProgress> CreateProgress(string payload, PreflightReport preflight, int sourceBase)
+    {
+        if (sourceBase < 0)
+        {
+            return new Helpers.DirectProgress<TypingProgress>(OnProgress);
+        }
+
+        var map = BuildNormalizedToRawMap(payload);
+        return new Helpers.DirectProgress<TypingProgress>(p =>
+        {
+            OnProgress(p);
+            if (p.CurrentUnitIndex < 0 || p.CurrentUnitIndex >= preflight.Units.Count) return;
+            var unit = preflight.Units[p.CurrentUnitIndex];
+            if (unit.SourceStart < 0 || unit.SourceStart >= map.Length - 1) return;
+
+            int rawStart = map[unit.SourceStart];
+            int rawEnd = map[Math.Min(unit.SourceStart + Math.Max(1, unit.SourceLength), map.Length - 1)];
+            var (start, len) = ExpandToWord(payload, rawStart, rawEnd - rawStart);
+            TypingHighlightChanged?.Invoke(start < 0 ? -1 : sourceBase + start, len);
+        });
+    }
+
+    private async Task<bool> TypeTextPayloadAsync(string textToType, string description, TypingSessionLease lease, int sourceBase = -1)
     {
         Guid sessionId = lease.SessionId;
         var token = lease.Token;
@@ -1083,7 +1144,7 @@ public sealed class MainViewModel : ObservableObject
                     : null
             };
 
-            var progress = new Helpers.DirectProgress<TypingProgress>(OnProgress);
+            var progress = CreateProgress(textToType, preflight, sourceBase);
 
             _log.Info("Digitação iniciada");
             await _typingService.TypeTextAsync(textToType, options, progress, lease.Pause, token).ConfigureAwait(true);
@@ -1135,6 +1196,7 @@ public sealed class MainViewModel : ObservableObject
         {
             _targetGuard.StopMonitoring();
             OnPropertyChanged(nameof(TargetIndicatorText));
+            if (sourceBase >= 0) TypingHighlightChanged?.Invoke(-1, 0);
         }
     }
 

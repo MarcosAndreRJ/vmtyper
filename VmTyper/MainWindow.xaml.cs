@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         viewModel.ConfirmPartialResume = ConfirmPartialResumeDialog;
         viewModel.ConfirmPreflightUnsupported = ConfirmPreflightUnsupportedDialog;
         viewModel.ConfirmTargetChanged = ConfirmTargetChangedDialog;
+        viewModel.EditorSelectionStartProvider = () => CodeEditor.SelectionStart;
+        viewModel.TypingHighlightChanged += (offset, length) => CodeEditor.SetTypingHighlight(offset, length);
 
         if (App.QueueLoadCorruptPath is { } corruptPath)
         {

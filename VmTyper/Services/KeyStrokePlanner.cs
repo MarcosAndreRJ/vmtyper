@@ -41,7 +41,9 @@ public sealed record InputUnit(
     UnitKind Kind,
     IReadOnlyList<KeyEvent> Events,
     string? UnsupportedReason = null,
-    bool IsLineBreak = false);
+    bool IsLineBreak = false,
+    int SourceStart = -1,
+    int SourceLength = 0);
 
 public sealed record UnsupportedUnitInfo(
     int Index,
@@ -120,9 +122,11 @@ public sealed class KeyStrokePlanner
         var units = new List<InputUnit>();
         var unsupportedList = new List<UnsupportedUnitInfo>();
         int unitIndex = 0;
+        var firstUnitOfToken = new List<int>(tokens.Count + 1);
 
         foreach (var token in tokens)
         {
+            firstUnitOfToken.Add(units.Count);
             if (token.ComboRule is { } subRule)
             {
                 if (subRule.Mode == SubstitutionMode.Sequencia)
@@ -185,6 +189,17 @@ public sealed class KeyStrokePlanner
             }
         }
 
+        // Posição de cada unidade no texto normalizado (todas as unidades de uma substituição
+        // compartilham o trecho de origem), usada para destacar o que está sendo digitado.
+        firstUnitOfToken.Add(units.Count);
+        for (int t = 0; t < tokens.Count; t++)
+        {
+            for (int u = firstUnitOfToken[t]; u < firstUnitOfToken[t + 1]; u++)
+            {
+                units[u] = units[u] with { SourceStart = tokens[t].Start, SourceLength = tokens[t].OriginalText.Length };
+            }
+        }
+
         var appliedRuleLabels = appliedRulesSet.Select(n => $"#{n}").ToList();
         return new PreflightReport(
             units,
@@ -196,7 +211,7 @@ public sealed class KeyStrokePlanner
             duplicateWarnings);
     }
 
-    private readonly record struct PlannedToken(string OriginalText, string Text, CharacterSubstitution? ComboRule);
+    private readonly record struct PlannedToken(string OriginalText, string Text, CharacterSubstitution? ComboRule, int Start);
 
     private static List<PlannedToken> TokenizeSinglePass(
         string text,
@@ -226,18 +241,18 @@ public sealed class KeyStrokePlanner
                 appliedRules.Add(m.ruleNumber);
                 if (m.sub.Mode is SubstitutionMode.Combinacao or SubstitutionMode.Sequencia)
                 {
-                    result.Add(new PlannedToken(m.sub.From, string.Empty, m.sub));
+                    result.Add(new PlannedToken(m.sub.From, string.Empty, m.sub, pos));
                 }
                 else if (!string.IsNullOrEmpty(m.sub.To))
                 {
-                    result.Add(new PlannedToken(m.sub.From, m.sub.To, null));
+                    result.Add(new PlannedToken(m.sub.From, m.sub.To, null, pos));
                 }
                 pos += m.sub.From.Length;
             }
             else
             {
                 string elem = StringInfo.GetNextTextElement(text, pos);
-                result.Add(new PlannedToken(elem, elem, null));
+                result.Add(new PlannedToken(elem, elem, null, pos));
                 pos += elem.Length;
             }
         }

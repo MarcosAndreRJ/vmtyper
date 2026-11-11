@@ -177,6 +177,7 @@ internal sealed class TypingScheduler
                     Sent = sent,
                     Skipped = skipped,
                     Failed = failed,
+                    CurrentUnitIndex = unit.Index,
                     Elapsed = stopwatch.Elapsed,
                     CharactersPerSecond = stopwatch.Elapsed.TotalSeconds > 0
                         ? sent / stopwatch.Elapsed.TotalSeconds
