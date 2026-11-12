@@ -109,9 +109,11 @@ public static class TextBoxHighlight
             Rect current = Rect.Empty;
             for (int i = r.Start; i < end; i++)
             {
-                var rect = _box.GetRectFromCharacterIndex(i);
-                if (rect.IsEmpty || double.IsInfinity(rect.Top)) continue;
-                var charRect = new Rect(rect.Left, rect.Top, Math.Max(rect.Width, 1), rect.Height);
+                // O retângulo da borda de ataque tem largura zero: a borda de fuga dá o fim do caractere.
+                var leading = _box.GetRectFromCharacterIndex(i);
+                var trailing = _box.GetRectFromCharacterIndex(i, true);
+                if (leading.IsEmpty || double.IsInfinity(leading.Top)) continue;
+                var charRect = new Rect(leading.Left, leading.Top, Math.Max(trailing.Left - leading.Left, 1), leading.Height);
 
                 if (!current.IsEmpty && Math.Abs(current.Top - charRect.Top) < 1)
                 {

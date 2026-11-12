@@ -290,7 +290,7 @@ public partial class CodeEditorControl : WpfUserControl
 
     private TypingHighlightRenderer InstallTypingHighlight()
     {
-        var renderer = new TypingHighlightRenderer(TextEditor.TextArea.TextView, () =>
+        var renderer = new TypingHighlightRenderer(() =>
             TryFindResource("EditorTypingHighlightBrush") as System.Windows.Media.Brush ?? DefaultHighlightBrush);
         TextEditor.TextArea.TextView.BackgroundRenderers.Add(renderer);
         return renderer;
@@ -319,32 +319,6 @@ public partial class CodeEditorControl : WpfUserControl
 
     private TypingHighlightRenderer? _typingHighlight;
 
-    private sealed class TypingHighlightRenderer : IBackgroundRenderer
-    {
-        private readonly TextView _view;
-        private readonly Func<System.Windows.Media.Brush> _brush;
-
-        public TypingHighlightRenderer(TextView view, Func<System.Windows.Media.Brush> brush)
-        {
-            _view = view;
-            _brush = brush;
-        }
-
-        public TextSegment? Segment { get; set; }
-
-        public KnownLayer Layer => KnownLayer.Selection;
-
-        public void Draw(TextView textView, System.Windows.Media.DrawingContext drawingContext)
-        {
-            if (Segment is not { } segment || !textView.VisualLinesValid) return;
-            var builder = new BackgroundGeometryBuilder { CornerRadius = 2, AlignToWholePixels = true };
-            builder.AddSegment(textView, segment);
-            if (builder.CreateGeometry() is { } geometry)
-            {
-                drawingContext.DrawGeometry(_brush(), null, geometry);
-            }
-        }
-    }
 
     /// <summary>Move o cursor para o início da linha informada (1-based, limitada ao documento).</summary>
     public void GoToLine(int line)
