@@ -904,7 +904,7 @@ public sealed class MainViewModel : ObservableObject
         _activeLease = lease;
         try
         {
-            bool ok = await TypeTextPayloadAsync(doc.Text, $"Documento completo '{doc.Name}'", lease).ConfigureAwait(true);
+            bool ok = await TypeTextPayloadAsync(doc.Text, $"Documento completo '{doc.Name}'", lease, 0).ConfigureAwait(true);
             if (ok)
             {
                 // O documento inteiro foi enviado: todos os blocos derivados dele também.
