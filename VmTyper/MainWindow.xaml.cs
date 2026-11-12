@@ -63,7 +63,9 @@ public partial class MainWindow : Window
         viewModel.ConfirmPreflightUnsupported = ConfirmPreflightUnsupportedDialog;
         viewModel.ConfirmTargetChanged = ConfirmTargetChangedDialog;
         viewModel.EditorSelectionStartProvider = () => CodeEditor.SelectionStart;
-        viewModel.TypingHighlightChanged += (offset, length) => CodeEditor.SetTypingHighlight(offset, length);
+        // O progresso chega da thread do motor; o editor só aceita chamadas da thread da interface.
+        viewModel.TypingHighlightChanged += (offset, length) =>
+            Dispatcher.InvokeAsync(() => CodeEditor.SetTypingHighlight(offset, length));
 
         if (App.QueueLoadCorruptPath is { } corruptPath)
         {

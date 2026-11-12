@@ -29,6 +29,17 @@ Conforme avaliado no [ADR 0006](adr/0006-avaliacao-publicacao-self-contained-sin
 dotnet publish VmTyper\VmTyper.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist\self-contained
 ```
 
+### 2.3 Local de entrega da versão (obrigatório)
+
+Toda versão compilada para uso deve ser disponibilizada em **`VmTyper\VmTyper\bin\x64\`** (a partir da raiz do repositório), contendo o executável autocontido `VmTyper.exe` e o pacote `VmTyper-win-x64.zip`. As pastas `Debug` e `Release` desse diretório são saída de compilação e não substituem a entrega.
+
+```powershell
+dotnet publish VmTyper\VmTyper.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o VmTyper\bin\x64
+Compress-Archive -Path VmTyper\bin\x64\VmTyper.exe -DestinationPath VmTyper\bin\x64\VmTyper-win-x64.zip -Force
+```
+
+A pasta `bin\` não é versionada. Para distribuir pelo GitHub, anexe o zip a um release (`gh release create vX.Y.Z VmTyper\bin\x64\VmTyper-win-x64.zip`).
+
 ---
 
 ## 3. Diretórios de Dados do Usuário

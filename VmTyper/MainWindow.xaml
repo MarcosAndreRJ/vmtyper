@@ -791,6 +791,7 @@
 
                                                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
                                                          IsReadOnly="{Binding IsTypingOrPaused}"
+                                                         helpers:TextBoxHighlight.Range="{Binding TypingHighlight}"
                                                          AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                                                          MaxHeight="150" VerticalScrollBarVisibility="Auto"
                                                          FontFamily="{DynamicResource EditorFontFamily}" Margin="0,8,0,6"

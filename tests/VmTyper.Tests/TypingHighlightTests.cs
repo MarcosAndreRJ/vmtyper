@@ -1,4 +1,5 @@
 using VmTyper.Models;
+using VmTyper.Documents;
 using VmTyper.Services;
 using VmTyper.Tests.Fakes;
 using VmTyper.ViewModels;
@@ -56,5 +57,88 @@ public sealed class TypingHighlightTests
         var (start, length) = MainViewModel.ExpandToWord(text, index, 1);
         Assert.Equal(expectedStart, start);
         Assert.Equal(expectedLength, length);
+    }
+}
+
+[Trait("Category", "Unit")]
+public sealed class QueueTypingHighlightTests
+{
+    [Fact]
+    public async Task QueueBlock_HighlightsEachWordWhileTyping_AndClearsAtTheEnd()
+    {
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        using var harness = new EngineHarness();
+        var settingsSvc = new SettingsService(dir.File("settings.json"));
+        settingsSvc.Save(new AppSettings { CountdownSeconds = 0, CharDelayMs = 0, EnterDelayMs = 0, EnableTargetGuard = false });
+
+        var queue = new TypingQueueService(log, new InMemoryQueueStore(), new ManualAutoSaveScheduler());
+        queue.Blocks[0].Text = "ola mundo";
+        var hotkeys = new FakeHotkeyRegistrar();
+        var vm = new MainViewModel(
+            harness.Engine, new ActiveWindowService(), settingsSvc, new HistoryService(dir.File("history.json")),
+            hotkeys, queue, log, new TypingSessionCoordinator(hotkeys, log), (_, _) => Task.CompletedTask);
+
+        var block = queue.Blocks[0];
+        var seen = new List<TextHighlight>();
+        block.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TextBlockItem.TypingHighlight) && block.TypingHighlight is { } h) seen.Add(h);
+        };
+
+        await vm.StartQueueBlockAsync();
+
+        Assert.Contains(new TextHighlight(0, 3), seen);   // "ola"
+        Assert.Contains(new TextHighlight(4, 5), seen);   // "mundo"
+        Assert.Null(block.TypingHighlight);
+    }
+}
+
+[Trait("Category", "Unit")]
+public sealed class EditorTypingHighlightTests
+{
+    private static async Task<List<(int Offset, int Length)>> TypeAsync(Func<MainViewModel, DocumentManager, Task> start)
+    {
+        using var dir = new TempDir();
+        var log = TestLog.Create(dir);
+        using var harness = new EngineHarness();
+        var settingsSvc = new SettingsService(dir.File("settings.json"));
+        settingsSvc.Save(new AppSettings { CountdownSeconds = 0, CharDelayMs = 0, EnterDelayMs = 0, EnableTargetGuard = false });
+
+        var manager = new DocumentManager();
+        manager.CreateNewDocument("ola mundo", "Doc");
+        var hotkeys = new FakeHotkeyRegistrar();
+        var vm = new MainViewModel(
+            harness.Engine, new ActiveWindowService(), settingsSvc, new HistoryService(dir.File("history.json")),
+            hotkeys, new TypingQueueService(log, new InMemoryQueueStore(), new ManualAutoSaveScheduler()), log,
+            new TypingSessionCoordinator(hotkeys, log), (_, _) => Task.CompletedTask, docManager: manager);
+
+        var seen = new List<(int, int)>();
+        vm.TypingHighlightChanged += (o, l) => seen.Add((o, l));
+        await start(vm, manager);
+        return seen;
+    }
+
+    [Fact]
+    public async Task WholeDocument_HighlightsEachWord_AndClearsAtTheEnd()
+    {
+        var seen = await TypeAsync((vm, _) => vm.StartDocumentAsync());
+
+        Assert.Contains((0, 3), seen);   // "ola"
+        Assert.Contains((4, 5), seen);   // "mundo"
+        Assert.Equal((-1, 0), seen[^1]);
+    }
+
+    [Fact]
+    public async Task Selection_HighlightsRelativeToTheSelectionStart()
+    {
+        var seen = await TypeAsync(async (vm, _) =>
+        {
+            vm.EditorSelectionStartProvider = () => 100;
+            await vm.StartSelectionAsync("ola mundo");
+        });
+
+        Assert.Contains((100, 3), seen);
+        Assert.Contains((104, 5), seen);
     }
 }
